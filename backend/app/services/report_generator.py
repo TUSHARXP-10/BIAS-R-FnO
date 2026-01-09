@@ -8,7 +8,7 @@ from datetime import datetime
 from app.services.signal_tracker import SignalTracker
 
 class ReportGenerator:
-    def generate_pdf(self, report_data):
+    def generate_pdf(self, report_data, is_weekly=False):
         signal_tracker = SignalTracker()
         # Ensure reports dir exists at project root
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -18,7 +18,10 @@ class ReportGenerator:
         os.makedirs(reports_dir, exist_ok=True)
         
         symbol = report_data.get('symbol', 'UNKNOWN')
-        filename = f"report_{symbol}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+        if is_weekly:
+            filename = f"weekly_report_{symbol}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+        else:
+            filename = f"report_{symbol}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
         filepath = os.path.join(reports_dir, filename)
         
         doc = SimpleDocTemplate(filepath, pagesize=letter)
