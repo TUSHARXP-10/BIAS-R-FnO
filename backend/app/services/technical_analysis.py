@@ -1,0 +1,380 @@
+import talib
+import numpy as np
+import pandas as pd
+
+class TechnicalAnalyzer:
+    def __init__(self, data):
+        """
+        data: pandas DataFrame with columns: Open, High, Low, Close, Volume
+        """
+        self.data = data
+        self.close = data['Close'].values
+        self.high = data['High'].values
+        self.low = data['Low'].values
+        self.open = data['Open'].values
+        self.volume = data['Volume'].values if 'Volume' in data.columns else None
+    
+    def _safe_float(self, value, precision=2):
+        """Safely convert numpy/talib values to float, handling NaN"""
+        if isinstance(value, (float, np.floating)) and (np.isnan(value) or np.isinf(value)):
+            return None
+        try:
+            return round(float(value), precision)
+        except (ValueError, TypeError):
+            return None
+
+    def calculate_all_indicators(self):
+        """Calculate all major technical indicators"""
+        indicators = {}
+        
+        # Current Price Info
+        indicators['current_price'] = self._safe_float(self.close[-1])
+        indicators['high'] = self._safe_float(self.high[-1])
+        indicators['low'] = self._safe_float(self.low[-1])
+        indicators['open'] = self._safe_float(self.open[-1])
+        
+        # RSI (Relative Strength Index)
+        rsi = talib.RSI(self.close, timeperiod=14)
+        indicators['rsi'] = self._safe_float(rsi[-1])
+        
+        # MACD
+        close_series = pd.Series(self.close)
+        ema12 = close_series.ewm(span=12, adjust=False).mean()
+        ema26 = close_series.ewm(span=26, adjust=False).mean()
+        macd_line = ema12 - ema26
+        signal_line = macd_line.ewm(span=9, adjust=False).mean()
+        hist_line = macd_line - signal_line
+        indicators['macd'] = self._safe_float(macd_line.iloc[-1], 2)
+        indicators['macd_signal'] = self._safe_float(signal_line.iloc[-1], 2)
+        indicators['macd_histogram'] = self._safe_float(hist_line.iloc[-1], 2)
+        macd_log_series = pd.Series(np.log(self.close)).ewm(span=12, adjust=False).mean() - pd.Series(np.log(self.close)).ewm(span=26, adjust=False).mean()
+        signal_log_series = macd_log_series.ewm(span=9, adjust=False).mean()
+        hist_log_series = macd_log_series - signal_log_series
+        indicators['macd_log'] = self._safe_float(macd_log_series.iloc[-1], 6)
+        indicators['macd_log_signal'] = self._safe_float(signal_log_series.iloc[-1], 6)
+        indicators['macd_log_histogram'] = self._safe_float(hist_log_series.iloc[-1], 6)
+        macd_pct_series = (ema12 - ema26) / ema26 * 100
+        signal_pct_series = macd_pct_series.ewm(span=9, adjust=False).mean()
+        hist_pct_series = macd_pct_series - signal_pct_series
+        indicators['macd_pct'] = self._safe_float(macd_pct_series.iloc[-1], 4)
+        indicators['macd_pct_signal'] = self._safe_float(signal_pct_series.iloc[-1], 4)
+        indicators['macd_pct_histogram'] = self._safe_float(hist_pct_series.iloc[-1], 4)
+        
+        # Bollinger Bands
+        bb_upper, bb_middle, bb_lower = talib.BBANDS(
+            self.close, 
+            timeperiod=20, 
+            nbdevup=2, 
+            nbdevdn=2
+        )
+        indicators['bb_upper'] = self._safe_float(bb_upper[-1])
+        indicators['bb_middle'] = self._safe_float(bb_middle[-1])
+        indicators['bb_lower'] = self._safe_float(bb_lower[-1])
+        
+        # EMAs
+        ema_20 = talib.EMA(self.close, timeperiod=20)
+        ema_50 = talib.EMA(self.close, timeperiod=50)
+        ema_200 = talib.EMA(self.close, timeperiod=200)
+        indicators['ema_20'] = self._safe_float(ema_20[-1])
+        indicators['ema_50'] = self._safe_float(ema_50[-1])
+        indicators['ema_200'] = self._safe_float(ema_200[-1])
+        
+        # ATR (Average True Range)
+        atr = talib.ATR(self.high, self.low, self.close, timeperiod=14)
+        indicators['atr'] = self._safe_float(atr[-1])
+        
+        # ADX (Trend Strength)
+        adx = talib.ADX(self.high, self.low, self.close, timeperiod=14)
+        indicators['adx'] = self._safe_float(adx[-1])
+        
+        # Stochastic
+        slowk, slowd = talib.STOCH(
+            self.high, 
+            self.low, 
+            self.close,
+            fastk_period=14,
+            slowk_period=3,
+            slowd_period=3
+        )
+        indicators['stoch_k'] = self._safe_float(slowk[-1])
+        indicators['stoch_d'] = self._safe_float(slowd[-1])
+        
+        return indicators
+    
+    def get_trend(self):
+        """Determine market trend"""
+        ema_20 = talib.EMA(self.close, timeperiod=20)[-1]
+        ema_50 = talib.EMA(self.close, timeperiod=50)[-1]
+        current_price = self.close[-1]
+        
+        if current_price > ema_20 > ema_50:
+            return "Bullish"
+        elif current_price < ema_20 < ema_50:
+            return "Bearish"
+        else:
+            return "Neutral"
+    
+    def get_signal(self):
+        """Generate trading signals based on indicators"""
+        rsi = talib.RSI(self.close, timeperiod=14)[-1]
+        macd, macd_signal, _ = talib.MACD(self.close, 12, 26, 9)
+        
+        signals = []
+        
+        # RSI signals
+        if rsi < 30:
+            signals.append(f"🟢 Oversold - Potential BUY signal (RSI: {rsi:.2f})")
+        elif rsi > 70:
+            signals.append(f"🔴 Overbought - Potential SELL signal (RSI: {rsi:.2f})")
+        else:
+            signals.append(f"🟡 Neutral RSI: {rsi:.2f}")
+        
+        # MACD signals
+        if macd[-1] > macd_signal[-1]:
+            signals.append("🟢 Bullish MACD crossover")
+        else:
+            signals.append("🔴 Bearish MACD crossover")
+        
+        # Trend signal
+        trend = self.get_trend()
+        if trend == "Bullish":
+            signals.append("📈 Strong uptrend detected")
+        elif trend == "Bearish":
+            signals.append("📉 Strong downtrend detected")
+        
+        return signals
+    
+    def get_support_resistance(self):
+        """Calculate support and resistance levels (last 20 candles)"""
+        recent_highs = self.high[-20:]
+        recent_lows = self.low[-20:]
+        
+        resistance = round(float(np.max(recent_highs)), 2)
+        support = round(float(np.min(recent_lows)), 2)
+        
+        return {
+            'resistance': resistance,
+            'support': support
+        }
+    
+    def _risk_reward(self, entry_price, target_price, stop_price):
+        try:
+            r = abs(entry_price - stop_price)
+            rr = abs(target_price - entry_price) / r if r > 0 else None
+            return round(float(rr), 2) if rr is not None else None
+        except Exception:
+            return None
+    
+    def generate_actionable_plan(self):
+        indicators = self.calculate_all_indicators()
+        sr = self.get_support_resistance()
+        trend = self.get_trend()
+        rsi = indicators.get('rsi')
+        adx = indicators.get('adx')
+        ema_20 = indicators.get('ema_20')
+        current_price = indicators.get('current_price')
+        support = sr.get('support')
+        resistance = sr.get('resistance')
+        if any(v is None for v in [rsi, adx, ema_20, current_price, support, resistance]):
+            return {
+                'decision': 'NO TRADE',
+                'reason': 'Insufficient data',
+                'entry_condition': 'Do not enter',
+                'target_1': None,
+                'target_2': None,
+                'stop_loss': None,
+                'invalidation': f"Wait for ADX > 20 or breakout of ₹{support}-₹{resistance}",
+                'risk_reward': None
+            }
+        if trend == "Bullish" and adx > 25 and rsi < 70:
+            decision = "LONG"
+            entry_condition = f"Above ₹{ema_20:.2f} with 5-min close"
+            target_1 = resistance
+            target_2 = round(resistance * 1.005, 2)
+            stop_loss = support
+            invalidation = f"Below ₹{support:.2f}"
+            reason = f"Strong {trend.lower()} trend (ADX {adx})"
+            rr = self._risk_reward(ema_20, target_1, stop_loss)
+        elif trend == "Bearish" and adx > 25 and rsi > 30:
+            decision = "SHORT"
+            entry_condition = f"Below ₹{ema_20:.2f} with 5-min close"
+            target_1 = support
+            target_2 = round(support * 0.995, 2)
+            stop_loss = resistance
+            invalidation = f"Above ₹{resistance:.2f}"
+            reason = f"Strong {trend.lower()} trend (ADX {adx})"
+            rr = self._risk_reward(ema_20, target_1, stop_loss)
+        else:
+            decision = "NO TRADE"
+            entry_condition = "Do not enter"
+            target_1 = None
+            target_2 = None
+            stop_loss = None
+            invalidation = f"Wait for ADX > 20 or breakout of ₹{support}-₹{resistance}"
+            reason = f"Weak/choppy conditions (ADX {adx})"
+            rr = None
+        return {
+            'decision': decision,
+            'reason': reason,
+            'entry_condition': entry_condition,
+            'target_1': target_1,
+            'target_2': target_2,
+            'stop_loss': stop_loss,
+            'invalidation': invalidation,
+            'risk_reward': rr
+        }
+    
+    def get_candlestick_patterns(self):
+        """Detect candlestick patterns"""
+        patterns = []
+        
+        # Doji
+        if talib.CDLDOJI(self.open, self.high, self.low, self.close)[-1] != 0:
+            patterns.append("Doji")
+        
+        # Hammer
+        if talib.CDLHAMMER(self.open, self.high, self.low, self.close)[-1] != 0:
+            patterns.append("Hammer")
+        
+        # Shooting Star
+        if talib.CDLSHOOTINGSTAR(self.open, self.high, self.low, self.close)[-1] != 0:
+            patterns.append("Shooting Star")
+        
+        # Engulfing
+        engulfing = talib.CDLENGULFING(self.open, self.high, self.low, self.close)[-1]
+        if engulfing > 0:
+            patterns.append("Bullish Engulfing")
+        elif engulfing < 0:
+            patterns.append("Bearish Engulfing")
+        
+        return patterns if patterns else ["No significant patterns detected"]
+
+    def get_trade_bias(self):
+        plan = self.generate_actionable_plan()
+        if plan['decision'] == 'LONG':
+            primary_bias = 'LONG'
+            stance = 'Long'
+            confidence = 8
+            sr = self.get_support_resistance()
+            invalidation = sr.get('support')
+            confirmation = sr.get('resistance')
+            execution = f"Enter {plan['entry_condition']}. Targets: ₹{plan['target_1']} / ₹{plan['target_2']}. SL: ₹{plan['stop_loss']}."
+        elif plan['decision'] == 'SHORT':
+            primary_bias = 'SHORT'
+            stance = 'Short'
+            confidence = 8
+            sr = self.get_support_resistance()
+            invalidation = sr.get('resistance')
+            confirmation = sr.get('support')
+            execution = f"Enter {plan['entry_condition']}. Targets: ₹{plan['target_1']} / ₹{plan['target_2']}. SL: ₹{plan['stop_loss']}."
+        else:
+            primary_bias = 'NO TRADE'
+            stance = 'No trade'
+            confidence = 3
+            sr = self.get_support_resistance()
+            invalidation = sr.get('support')
+            confirmation = sr.get('resistance')
+            execution = "Do not enter. Wait for ADX > 20 or clear breakout."
+        return {
+            'primary_bias': primary_bias,
+            'stance': stance,
+            'confidence': confidence,
+            'invalidation': invalidation,
+            'confirmation': confirmation,
+            'execution': execution
+        }
+
+    def get_risk_context(self):
+        indicators = self.calculate_all_indicators()
+        atr = indicators.get('atr')
+        adx = indicators.get('adx')
+        current_price = indicators.get('current_price')
+        if atr is None or current_price is None or adx is None:
+            return {
+                'atr': atr,
+                'atr_percentage': None,
+                'volatility': "Unknown",
+                'sizing_advice': "Insufficient data",
+                'adx': adx,
+                'trend_strength': "Unknown",
+                'trend_advice': "Gather more data"
+            }
+        atr_pct = (atr / current_price) * 100
+        if atr_pct > 2:
+            volatility = "High"
+            sizing_advice = "Reduce position size, wider stops needed"
+        elif atr_pct > 1:
+            volatility = "Moderate"
+            sizing_advice = "Normal position sizing acceptable"
+        else:
+            volatility = "Low"
+            sizing_advice = "Can use tighter stops, standard sizing"
+        if adx > 25:
+            trend_strength = "Strong"
+            trend_advice = "Trend-following strategies favorable"
+        elif adx > 20:
+            trend_strength = "Moderate"
+            trend_advice = "Mixed signals, use caution"
+        else:
+            trend_strength = "Weak"
+            trend_advice = "Range-bound likely, avoid trend trades"
+        return {
+            'atr': round(float(atr), 2),
+            'atr_percentage': round(float(atr_pct), 2),
+            'volatility': volatility,
+            'sizing_advice': sizing_advice,
+            'adx': round(float(adx), 2),
+            'trend_strength': trend_strength,
+            'trend_advice': trend_advice
+        }
+
+    def get_market_regime(self):
+        indicators = self.calculate_all_indicators()
+        trend = self.get_trend()
+        adx = indicators.get('adx')
+        current_price = indicators.get('current_price')
+        atr = indicators.get('atr')
+        if adx is None or current_price is None or atr is None:
+            return {'regime': 'Unknown', 'description': 'Insufficient data'}
+        atr_pct = (atr / current_price) * 100
+        if adx > 25 and atr_pct < 1.5:
+            regime = "Strong Trend"
+            description = "Trending cleanly"
+        elif adx > 25 and atr_pct > 2:
+            regime = "Volatile Trend"
+            description = "Trending but choppy"
+        elif adx < 20 and atr_pct < 1.5:
+            regime = "Range-Bound"
+            description = "Low volatility consolidation"
+        else:
+            regime = "Weak Trend / Range-biased"
+            description = f"with {trend.lower()} tilt"
+        return {'regime': regime, 'description': description}
+
+    def get_position_sizing(self):
+        risk_context = self.get_risk_context()
+        trade_bias = self.get_trade_bias()
+        volatility = risk_context.get('volatility')
+        confidence = trade_bias.get('confidence', 0)
+        if volatility == "High":
+            size_multiplier = 0.5
+            advice = "Reduce position size to 50% of normal"
+        elif volatility == "Moderate":
+            size_multiplier = 0.75
+            advice = "Use 75% of normal position size"
+        else:
+            size_multiplier = 1.0
+            advice = "Standard position sizing acceptable"
+        if confidence < 5:
+            advice += " (low conviction → further reduce or avoid)"
+        return {'size_multiplier': size_multiplier, 'advice': advice}
+
+    def get_overall_signal(self):
+        indicators = self.calculate_all_indicators()
+        adx = indicators.get('adx')
+        trend = self.get_trend()
+        if adx is None:
+            return "Unknown"
+        if adx < 20:
+            return f"Mixed ({trend} trend, weakening momentum)"
+        return trend
