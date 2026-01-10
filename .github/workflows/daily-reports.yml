@@ -19,7 +19,6 @@ permissions:
 jobs:
   generate-reports:
     runs-on: ubuntu-latest
-    environment: production
     
     steps:
       - name: Check out repository
