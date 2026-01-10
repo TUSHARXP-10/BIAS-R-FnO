@@ -117,9 +117,8 @@ def main():
     reports_dir = os.path.join(repo_root, 'reports')
     os.makedirs(reports_dir, exist_ok=True)
     
-    # Delete old reports if it's a weekday or if we're generating a new weekly report
-    if current_day not in ['saturday', 'sunday']:
-        delete_old_reports(reports_dir)
+    # Delete old reports every day, regardless of day
+    delete_old_reports(reports_dir)
     
     print(f"Starting report generation...")
     print(f"Report date: {report_date.strftime('%Y-%m-%d')}")
