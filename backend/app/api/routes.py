@@ -14,7 +14,10 @@ chart_generator = ChartGenerator()
 @bp.route('/reports/view/<filename>', methods=['GET'])
 def view_report(filename):
     """Serve PDF reports"""
-    reports_dir = os.path.join(os.getcwd(), 'reports')
+    # Get project root directory
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+    reports_dir = os.path.join(project_root, 'reports')
     return send_from_directory(reports_dir, filename)
 
 @bp.route('/reports/preview/<filename>/<int:page>', methods=['GET'])
@@ -23,7 +26,10 @@ def preview_report_page(filename, page):
     try:
         import fitz
         import io
-        reports_dir = os.path.join(os.getcwd(), 'reports')
+        # Get project root directory
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+        reports_dir = os.path.join(project_root, 'reports')
         pdf_path = os.path.join(reports_dir, filename)
         if not os.path.exists(pdf_path):
             return jsonify({'error': 'File not found'}), 404
@@ -115,6 +121,20 @@ def generate_report():
             'overall_signal': overall_signal,
             'action_plan': action_plan
         }
+        
+        # Clean up old reports before generating new ones
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+        reports_dir = os.path.join(project_root, 'reports')
+        
+        # Delete all old reports except weekly ones (if any)
+        files_deleted = 0
+        for filename in os.listdir(reports_dir):
+            file_path = os.path.join(reports_dir, filename)
+            if os.path.isfile(file_path) and filename.endswith('.pdf'):
+                os.remove(file_path)
+                files_deleted += 1
+        print(f"Deleted {files_deleted} old reports from {reports_dir}")
         
         # Generate PDF
         pdf_path = report_generator.generate_pdf(report_data)

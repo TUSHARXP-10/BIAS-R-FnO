@@ -87,16 +87,21 @@ def generate_report_for_symbol(symbol, report_date, is_weekly=False):
         print(f"❌ Error generating report for {symbol}: {str(e)}")
         return None
 
-def delete_old_reports(reports_dir):
-    """Delete all old reports except weekly reports."""
+def delete_old_reports(reports_dir, keep_latest_only=True):
+    """Delete all old reports, keeping only the latest ones."""
+    if not os.path.exists(reports_dir):
+        print(f"Reports directory not found: {reports_dir}")
+        return 0
+    
     print(f"Deleting old reports from: {reports_dir}")
     files_deleted = 0
     
-    for filename in os.listdir(reports_dir):
-        file_path = os.path.join(reports_dir, filename)
-        if os.path.isfile(file_path):
-            # Keep weekly reports (filename contains 'weekly')
-            if 'weekly' not in filename.lower():
+    # If we want to keep only the latest reports, delete all reports
+    if keep_latest_only:
+        # Delete all report files
+        for filename in os.listdir(reports_dir):
+            file_path = os.path.join(reports_dir, filename)
+            if os.path.isfile(file_path) and filename.endswith('.pdf'):
                 os.remove(file_path)
                 files_deleted += 1
     
@@ -114,15 +119,20 @@ def main():
     
     # Ensure reports directory exists at repo root
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    reports_dir = os.path.join(repo_root, 'reports')
-    os.makedirs(reports_dir, exist_ok=True)
+    repo_reports_dir = os.path.join(repo_root, 'reports')
+    os.makedirs(repo_reports_dir, exist_ok=True)
     
-    # Delete old reports every day, regardless of day
-    delete_old_reports(reports_dir)
+    # Ensure backend reports directory exists
+    backend_reports_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports')
+    os.makedirs(backend_reports_dir, exist_ok=True)
+    
+    # Delete old reports from both directories every day, regardless of day
+    delete_old_reports(repo_reports_dir)
+    delete_old_reports(backend_reports_dir)
     
     print(f"Starting report generation...")
     print(f"Report date: {report_date.strftime('%Y-%m-%d')}")
-    print(f"Reports will be saved to: {reports_dir}")
+    print(f"Reports will be saved to: {repo_reports_dir}")
     
     generated_files = []
     
