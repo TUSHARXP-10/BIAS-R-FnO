@@ -34,7 +34,12 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libfreetype6-dev libpng-dev libjpeg-dev git
+          sudo apt-get install -y libfreetype6-dev libpng-dev libjpeg-dev git wget
+          
+          # Install TA-Lib C library (required for Python TA-Lib wrapper)
+          # Using Debian package for Ubuntu as recommended by TA-Lib documentation
+          wget -O ta-lib.deb https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib_0.6.4_amd64.deb
+          sudo dpkg -i ta-lib.deb || sudo apt-get install -f -y
       
       - name: Install Python dependencies
         run: |

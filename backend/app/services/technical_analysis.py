@@ -251,11 +251,17 @@ class TechnicalAnalyzer:
 
     def get_trade_bias(self):
         plan = self.generate_actionable_plan()
+        indicators = self.calculate_all_indicators()
+        sr = self.get_support_resistance()
+        trend = self.get_trend()
+        current_price = indicators.get('current_price')
+        adx = indicators.get('adx')
+        rsi = indicators.get('rsi')
+        
         if plan['decision'] == 'LONG':
             primary_bias = 'LONG'
             stance = 'Long'
             confidence = 8
-            sr = self.get_support_resistance()
             invalidation = sr.get('support')
             confirmation = sr.get('resistance')
             execution = f"Enter {plan['entry_condition']}. Targets: ₹{plan['target_1']} / ₹{plan['target_2']}. SL: ₹{plan['stop_loss']}."
@@ -263,18 +269,35 @@ class TechnicalAnalyzer:
             primary_bias = 'SHORT'
             stance = 'Short'
             confidence = 8
-            sr = self.get_support_resistance()
             invalidation = sr.get('resistance')
             confirmation = sr.get('support')
             execution = f"Enter {plan['entry_condition']}. Targets: ₹{plan['target_1']} / ₹{plan['target_2']}. SL: ₹{plan['stop_loss']}."
         else:
             primary_bias = 'NO TRADE'
             stance = 'No trade'
-            confidence = 3
-            sr = self.get_support_resistance()
+            # Calculate confidence based on actual market conditions
+            if adx and adx < 15:
+                confidence = 2
+                reason = f"Very weak trend strength (ADX: {adx:.1f})"
+            elif adx and 15 <= adx <= 20:
+                confidence = 3
+                reason = f"Weak trend strength (ADX: {adx:.1f})"
+            elif rsi and (rsi < 40 or rsi > 60):
+                confidence = 4
+                reason = f"RSI extreme ({rsi:.1f}) but no clear trend"
+            else:
+                confidence = 3
+                reason = f"Choppy market conditions"
+            
             invalidation = sr.get('support')
             confirmation = sr.get('resistance')
-            execution = "Do not enter. Wait for ADX > 20 or clear breakout."
+            
+            # More detailed execution plan with actual values
+            execution = f"Do not enter. {reason}. "
+            if adx:
+                execution += f"Current ADX: {adx:.1f} (wait for ADX > 20). "
+            execution += f"Price range: ₹{current_price:.2f} between support (₹{sr['support']}) and resistance (₹{sr['resistance']}). "
+            execution += f"Wait for clear breakout above ₹{sr['resistance']} (for LONG) or below ₹{sr['support']} (for SHORT)."
         return {
             'primary_bias': primary_bias,
             'stance': stance,

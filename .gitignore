@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Generated files
+charts/
+reports/
+*.pdf
+
+# Signals
+backend/signals/
+
+# Instance files (Flask)
+backend/instance/
+
+# Test files
+*.test.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
