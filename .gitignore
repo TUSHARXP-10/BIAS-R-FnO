@@ -10,9 +10,7 @@ __pycache__/
 .env.*.local
 
 # Generated files
-charts/
-reports/
-*.pdf
+backend/charts/
 
 # Signals
 backend/signals/
