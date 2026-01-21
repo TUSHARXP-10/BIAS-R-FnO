@@ -26,71 +26,51 @@ class ReportGenerator:
         
         doc = SimpleDocTemplate(filepath, pagesize=letter)
         styles = getSampleStyleSheet()
+        decision_style = ParagraphStyle('Decision', parent=styles['Heading1'])
+        decision_positive_style = ParagraphStyle('DecisionPositive', parent=styles['Heading1'])
         story = []
         
         # Title
         title_style = styles['Title']
         display_symbol = str(symbol).upper()
-        story.append(Paragraph(f"Trading Report for {display_symbol}", title_style))
+        story.append(Paragraph(f"{display_symbol} DAILY TRADING REPORT", title_style))
         report_date = report_data.get('date')
-        story.append(Paragraph(f"Date: {report_date}", styles['Normal']))
-        story.append(Spacer(1, 20))
-
         tf = report_data.get('timeframe', {})
-        tf_text = f"📊 Analysis Timeframe: {tf.get('chart_interval', '1 Day')} Chart ({tf.get('data_period', '')})<br/>🎯 Trade Horizon: {tf.get('analysis_type', '')}"
-        story.append(Paragraph(tf_text, styles['Normal']))
-        story.append(Spacer(1, 10))
-        mr = report_data.get('market_regime', {})
-        mr_text = f"📊 Market Regime: {mr.get('regime', 'N/A')} {(' - ' + mr.get('description')) if mr.get('description') else ''}"
-        story.append(Paragraph(mr_text, styles['Normal']))
-        story.append(Spacer(1, 10))
+        story.append(Paragraph(f"📅 Date: {report_date}", styles['Normal']))
+        story.append(Paragraph(f"📊 Timeframe: {tf.get('chart_interval', '1 Day')} Chart ({tf.get('data_period', '')})", styles['Normal']))
+        story.append(Paragraph(f"⏳ Trade Horizon: {tf.get('analysis_type', '')}", styles['Normal']))
+        story.append(Paragraph("This report is for swing/positional traders. Intraday traders should ignore this.", styles['Normal']))
+        story.append(Spacer(1, 12))
 
         ap = report_data.get('action_plan', {})
-        story.append(Paragraph("Action Plan", styles['Heading2']))
-        ap_text = f"""
-        Decision: <b>{ap.get('decision', 'N/A')}</b><br/>
-        Reason: {ap.get('reason', 'N/A')}<br/>
-        Entry: {ap.get('entry_condition', 'N/A')}<br/>
-        Target 1: {ap.get('target_1', 'N/A')}<br/>
-        Target 2: {ap.get('target_2', 'N/A')}<br/>
-        Stop Loss: {ap.get('stop_loss', 'N/A')}<br/>
-        Risk:Reward: {ap.get('risk_reward', 'N/A')}<br/>
-        Invalidation: {ap.get('invalidation', 'N/A')}
-        """
-        story.append(Paragraph(ap_text, styles['Normal']))
         ap_decision = ap.get('decision', 'N/A')
         if ap_decision == "NO TRADE":
-            sr = report_data.get('support_resistance', {})
-            indicators = report_data.get('indicators', {})
-            rc = report_data.get('risk_context', {})
-            ps = report_data.get('position_sizing', {})
-            potential_text = f"""
-            ⏳ <b>POTENTIAL SETUPS (WAIT FOR TRIGGER)</b><br/>
-            Long Trigger: ADX > 20 + breakout above ₹{sr.get('resistance', 'N/A')}<br/>
-            Short Trigger: ADX > 20 + breakdown below ₹{sr.get('support', 'N/A')}<br/>
-            Current Price: ₹{indicators.get('current_price', 'N/A')}<br/>
-            Status: No trigger — stay flat
-            """
-            story.append(Paragraph(potential_text, styles['Normal']))
-            story.append(Spacer(1, 6))
-            risk_critical = f"""
-            ⚠️ <b>RISK ASSESSMENT (CRITICAL)</b><br/>
-            ATR: ₹{rc.get('atr', 'N/A')} ({rc.get('atr_percentage', 'N/A')}% of price)<br/>
-            Volatility: {rc.get('volatility', 'N/A')} → {rc.get('sizing_advice', 'N/A')}<br/>
-            Trend Strength: {rc.get('trend_strength', 'N/A')} (ADX: {rc.get('adx', 'N/A')})<br/>
-            Position Guidance: {ps.get('advice', 'N/A')}
-            """
-            story.append(Paragraph(risk_critical, styles['Normal']))
+            decision_style.textColor = colors.red
+            story.append(Paragraph(f"🔴 FINAL DECISION: {ap_decision}", decision_style))
+        else:
+            decision_positive_style.textColor = colors.green
+            story.append(Paragraph(f"🟢 FINAL DECISION: {ap_decision}", decision_positive_style))
+        story.append(Paragraph(f"Reason: {ap.get('reason', 'N/A')}", styles['Normal']))
+        if ap_decision == "NO TRADE":
+            story.append(Paragraph("Next Action: WAIT", styles['Normal']))
+        story.append(Spacer(1, 10))
+
+        mr = report_data.get('market_regime', {})
+        mr_text = f"🧠 Market Regime: {mr.get('regime', 'N/A')} {(' - ' + mr.get('description')) if mr.get('description') else ''}"
+        story.append(Paragraph(mr_text, styles['Normal']))
         story.append(Spacer(1, 10))
 
         # Extract data
         trend = report_data.get('trend', 'Neutral')
         indicators = report_data.get('indicators', {})
+        sr = report_data.get('support_resistance', {})
+        rc = report_data.get('risk_context', {})
+        ps = report_data.get('position_sizing', {})
+        tb = report_data.get('trade_bias', {})
         
         # Executive Summary
         story.append(Paragraph("Executive Summary", styles['Heading2']))
         overall_signal = report_data.get('overall_signal', 'Neutral')
-        mr = report_data.get('market_regime', {})
         if ap_decision == "NO TRADE":
             overall_signal = "Neutral (No Trade)"
             summary_text = f"""
@@ -108,50 +88,96 @@ class ReportGenerator:
             Overall signal: <b>{overall_signal}</b>
             """
         story.append(Paragraph(summary_text, styles['Normal']))
+        story.append(Paragraph(f"Confidence Score: {tb.get('confidence', 'N/A')}/10", styles['Normal']))
+        story.append(Spacer(1, 12))
+
+        story.append(Paragraph("Key Levels", styles['Heading2']))
+        story.append(Paragraph(f"Resistance: {sr.get('resistance', 'N/A')}", styles['Normal']))
+        story.append(Paragraph(f"Support: {sr.get('support', 'N/A')}", styles['Normal']))
         story.append(Spacer(1, 10))
 
-        # Market Chart
+        story.append(Paragraph("If–Then Decision Logic", styles['Heading2']))
+        logic_text = f"""
+        IF ADX > 20 AND price > ₹{sr.get('resistance', 'N/A')} → Look for LONG<br/>
+        IF ADX > 20 AND price < ₹{sr.get('support', 'N/A')} → Look for SHORT<br/>
+        ELSE → NO TRADE
+        """
+        story.append(Paragraph(logic_text, styles['Normal']))
+        story.append(Spacer(1, 10))
+
+        if ap_decision in ["LONG", "SHORT"]:
+            story.append(Paragraph("Trade Setup", styles['Heading2']))
+            setup_text = f"""
+            Direction: {ap_decision}<br/>
+            Entry: {ap.get('entry_condition', 'N/A')}<br/>
+            Target 1: {ap.get('target_1', 'N/A')}<br/>
+            Target 2: {ap.get('target_2', 'N/A')}<br/>
+            Stop Loss: {ap.get('stop_loss', 'N/A')}<br/>
+            Risk:Reward: {ap.get('risk_reward', 'N/A')}
+            """
+            story.append(Paragraph(setup_text, styles['Normal']))
+            story.append(Spacer(1, 10))
+        else:
+            story.append(Paragraph("If No Trade – What To Wait For", styles['Heading2']))
+            no_trade_text = f"""
+            Condition 1: ADX > 20 and breakout above ₹{sr.get('resistance', 'N/A')}<br/>
+            Condition 2: ADX > 20 and breakdown below ₹{sr.get('support', 'N/A')}<br/>
+            Current Price: ₹{indicators.get('current_price', 'N/A')}<br/>
+            Status: No trigger — wait
+            """
+            story.append(Paragraph(no_trade_text, styles['Normal']))
+            story.append(Spacer(1, 10))
+
+        story.append(Paragraph("Risk Assessment", styles['Heading2']))
+        rc_text = f"""
+        Volatility: {rc.get('volatility', 'N/A')}<br/>
+        ATR: ₹{rc.get('atr', 'N/A')} ({rc.get('atr_percentage', 'N/A')}% of price)<br/>
+        Position sizing guidance: {ps.get('advice', 'N/A')}<br/>
+        Conviction score: {tb.get('confidence', 'N/A')}/10
+        """
+        story.append(Paragraph(rc_text, styles['Normal']))
+        story.append(Spacer(1, 10))
+
+        rsi = indicators.get('rsi')
+        adx = indicators.get('adx')
+        rsi_state = "neutral"
+        if rsi is not None:
+            if rsi >= 70:
+                rsi_state = "overbought"
+            elif rsi <= 30:
+                rsi_state = "oversold"
+        active_text = f"""
+        Trend strength: {rc.get('trend_strength', 'N/A')} (ADX: {adx if adx is not None else 'N/A'}) drives the decision.<br/>
+        Momentum: RSI {rsi if rsi is not None else 'N/A'} is {rsi_state}, but trend strength has priority.
+        """
+        story.append(Paragraph("Active Signals (Interpreted)", styles['Heading2']))
+        story.append(Paragraph(active_text, styles['Normal']))
+        story.append(Spacer(1, 10))
+
+        story.append(Paragraph("What Not To Do", styles['Heading2']))
+        if ap_decision == "NO TRADE":
+            dont_text = """
+            • Buy just because RSI is oversold<br/>
+            • Short inside the range without ADX expansion<br/>
+            • Trade without a clear breakout or breakdown trigger
+            """
+        else:
+            dont_text = """
+            • Chase price without the stated entry condition<br/>
+            • Ignore the stop loss or move it wider<br/>
+            • Oversize positions during high ATR volatility
+            """
+        story.append(Paragraph(dont_text, styles['Normal']))
+        story.append(Spacer(1, 10))
+
         chart_path = report_data.get('chart_path')
         if chart_path and os.path.exists(chart_path):
-            # Scale image to fit width (approx 450-500 points for letter)
-            # Increased height for 3-panel chart
             im = Image(chart_path, width=500, height=500) 
             story.append(im)
             story.append(Spacer(1, 20))
-        
-        # Technical Analysis Detail
-        story.append(Paragraph("Technical Analysis Detail", styles['Heading2']))
-        
-        # Trend Analysis
-        trend = report_data.get('trend', 'Neutral')
-        trend_color = "green" if trend == "Bullish" else "red" if trend == "Bearish" else "black"
-        story.append(Paragraph(f"Trend: <font color='{trend_color}'><b>{trend}</b></font>", styles['Normal']))
-        story.append(Spacer(1, 10))
-
-        tb = report_data.get('trade_bias', {})
-        story.append(Paragraph("TRADE BIAS", styles['Heading2']))
-        tb_text = f"Primary Bias: {tb.get('primary_bias', 'N/A')}<br/>Current Stance: {tb.get('stance', 'N/A')}<br/>Conviction: {tb.get('confidence', 'N/A')}/10<br/><br/>Execution Plan: {tb.get('execution', 'N/A')}<br/><br/>Invalidation Level: ₹{tb.get('invalidation', 'N/A')}<br/>Confirmation Level: ₹{tb.get('confirmation', 'N/A')}"
-        story.append(Paragraph(tb_text, styles['Normal']))
-        story.append(Spacer(1, 10))
-
-        rc = report_data.get('risk_context', {})
-        story.append(Paragraph("RISK ASSESSMENT", styles['Heading2']))
-        rc_text = f"ATR: ₹{rc.get('atr', 'N/A')} ({rc.get('atr_percentage', 'N/A')}% of price)<br/>Volatility: {rc.get('volatility', 'N/A')} → {rc.get('sizing_advice', 'N/A')}<br/>Expected Daily Range: ±{rc.get('atr', 'N/A')} points<br/><br/>ADX: {rc.get('adx', 'N/A')} ({rc.get('trend_strength', 'N/A')})<br/>Trend Strength: {rc.get('trend_strength', 'N/A')} → {rc.get('trend_advice', 'N/A')}"
-        story.append(Paragraph(rc_text, styles['Normal']))
-        ps = report_data.get('position_sizing', {})
-        story.append(Paragraph(f"Position Sizing Guidance: {ps.get('advice', 'N/A')}", styles['Normal']))
-        story.append(Spacer(1, 10))
-
-        # Signals
-        if report_data.get('signals'):
-            story.append(Paragraph("<b>Active Signals:</b>", styles['Normal']))
-            for signal in report_data.get('signals', []):
-                story.append(Paragraph(f"• {signal}", styles['Normal']))
-            story.append(Spacer(1, 10))
 
         
-        # Technical Indicators Table
-        story.append(Paragraph("Technical Indicators", styles['Heading2']))
+        story.append(Paragraph("Indicator Snapshot", styles['Heading2']))
         
         table_data = [
             ["Indicator", "Value"],
@@ -180,32 +206,17 @@ class ReportGenerator:
         story.append(t)
         story.append(Spacer(1, 20))
 
-        # Support & Resistance
-        story.append(Paragraph("Support & Resistance", styles['Heading2']))
-        sr = report_data.get('support_resistance', {})
-        story.append(Paragraph(f"Resistance: {sr.get('resistance', 'N/A')}", styles['Normal']))
-        story.append(Paragraph(f"Support: {sr.get('support', 'N/A')}", styles['Normal']))
-        story.append(Spacer(1, 10))
-
-        # Patterns
-        story.append(Paragraph("Candlestick Patterns", styles['Heading2']))
-        for pattern in report_data.get('patterns', []):
-            story.append(Paragraph(f"• {pattern}", styles['Normal']))
-        story.append(Spacer(1, 10))
-
-        # Educational Guide
-        story.append(Paragraph("Understanding This Report", styles['Heading2']))
+        story.append(Paragraph("Appendix: Indicator Notes", styles['Heading2']))
         guide_text = """
-        <b>RSI (Relative Strength Index):</b> Measures momentum. Values > 70 suggest the asset is overbought (potential drop), while < 30 suggest oversold (potential rise).<br/>
-        <b>MACD:</b> Trend-following momentum indicator. Crossovers between the MACD line and Signal line can indicate trend changes.<br/>
-        <b>Bollinger Bands:</b> A volatility indicator. Prices often rebound from the upper/lower bands. Squeezes indicate low volatility and potential breakout.<br/>
-        <b>EMA (Exponential Moving Average):</b> Weighted averages of price. EMA 20/50 are for short/medium trends, EMA 200 for long-term trend.<br/>
-        <b>ADX:</b> Measures trend strength. ADX > 25 indicates a strong trend (up or down). < 20 indicates a weak or ranging market.
+        <b>RSI:</b> Momentum gauge. Overbought above 70, oversold below 30.<br/>
+        <b>MACD:</b> Trend-following momentum and crossover signal.<br/>
+        <b>Bollinger Bands:</b> Volatility bands used for squeeze and breakout context.<br/>
+        <b>EMA:</b> Weighted trend averages (20/50/200).<br/>
+        <b>ADX:</b> Trend strength; below 20 is weak or range.
         """
         story.append(Paragraph(guide_text, styles['Normal']))
-        story.append(Spacer(1, 20))
+        story.append(Spacer(1, 10))
 
-        # Data Methodology
         story.append(Paragraph("Data Methodology", styles['Heading2']))
         methodology_text = """
         <b>Market Data Source:</b> Yahoo Finance (Daily OHLCV)<br/>
@@ -217,14 +228,8 @@ class ReportGenerator:
         story.append(Paragraph(methodology_text, styles['Normal']))
         story.append(Spacer(1, 10))
 
-        # Disclaimer
         story.append(Paragraph("Disclaimer", styles['Heading2']))
-        disclaimer_text = """
-        This report is generated by MarketInsight Pro for informational purposes only. 
-        It does not constitute financial advice, investment recommendations, or an offer to buy or sell any securities. 
-        Trading in financial markets involves a high degree of risk and may not be suitable for all investors. 
-        Past performance is not indicative of future results. Please consult with a qualified financial advisor before making any investment decisions.
-        """
+        disclaimer_text = "Informational only. Not financial advice."
         story.append(Paragraph(disclaimer_text, styles['Italic']))
         
         # Log the signal

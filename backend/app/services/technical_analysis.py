@@ -186,7 +186,7 @@ class TechnicalAnalyzer:
                 'invalidation': f"Wait for ADX > 20 or breakout of ₹{support}-₹{resistance}",
                 'risk_reward': None
             }
-        if trend == "Bullish" and adx > 25 and rsi < 70:
+        if trend == "Bullish" and adx > 20 and rsi < 70:
             decision = "LONG"
             entry_condition = f"Above ₹{ema_20:.2f} with 5-min close"
             target_1 = resistance
@@ -195,7 +195,7 @@ class TechnicalAnalyzer:
             invalidation = f"Below ₹{support:.2f}"
             reason = f"Strong {trend.lower()} trend (ADX {adx})"
             rr = self._risk_reward(ema_20, target_1, stop_loss)
-        elif trend == "Bearish" and adx > 25 and rsi > 30:
+        elif trend == "Bearish" and adx > 20 and rsi > 30:
             decision = "SHORT"
             entry_condition = f"Below ₹{ema_20:.2f} with 5-min close"
             target_1 = support
