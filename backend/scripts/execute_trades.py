@@ -5,10 +5,10 @@ import sys
 from math import floor
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
-try:
-    from backend.scripts.groww_client import GrowwClient
-except Exception:
-    from scripts.groww_client import GrowwClient
+scripts_dir = os.path.dirname(os.path.abspath(__file__))
+if scripts_dir not in sys.path:
+    sys.path.insert(0, scripts_dir)
+from groww_client import GrowwClient
 
 def ist_now():
     return datetime.now(ZoneInfo("Asia/Kolkata"))
