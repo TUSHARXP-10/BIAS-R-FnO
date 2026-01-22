@@ -1,24 +1,31 @@
-name: Daily Trading Reports
+name: Trading Reports Automation
 
 on:
   schedule:
-    # Run daily at 6:00 AM UTC (11:30 AM IST)
-    - cron: '0 6 * * *'
+    - cron: '30 2 * * *'
+    - cron: '30 14 * * *'
+    - cron: '30 15 * * *'
   workflow_dispatch:
-    # Allow manual trigger
     inputs:
-      reason:
-        description: 'Reason for manual trigger'
+      run_mode:
+        description: 'morning | cleanup | night'
         required: false
-        default: 'Manual run'
+        default: 'morning'
+      run_tag:
+        description: 'Optional report tag (example: r1)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
   actions: write
 
 jobs:
-  generate-reports:
+  morning-generate:
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' && inputs.run_mode == 'morning' ||
+      github.event_name == 'schedule' && github.event.schedule == '30 2 * * *'
     
     steps:
       - name: Check out repository
@@ -48,8 +55,7 @@ jobs:
       
       - name: Generate reports
         run: |
-          cd backend
-          python generate_reports.py
+          python backend/generate_reports.py --mode generate
       
       - name: Configure Git user
         run: |
@@ -61,7 +67,7 @@ jobs:
           # Check if there are any new reports
           if [ -n "$(git status --porcelain reports/)" ]; then
             git add reports/
-            git commit -m "Add daily reports for $(date +'%Y-%m-%d')"
+            git commit -m "Add morning reports for $(date +'%Y-%m-%d')"
             git push
             echo "Reports successfully pushed to repository"
           else
@@ -71,4 +77,98 @@ jobs:
       - name: Clean up temporary files
         run: |
           # Remove chart files if they're not needed
+          rm -f backend/charts/* 2>/dev/null || true
+
+  evening-cleanup:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' && inputs.run_mode == 'cleanup' ||
+      github.event_name == 'schedule' && github.event.schedule == '30 14 * * *'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Clean reports
+        run: |
+          python backend/generate_reports.py --mode cleanup
+
+      - name: Configure Git user
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Commit and push cleanup
+        run: |
+          if [ -n "$(git status --porcelain reports/)" ]; then
+            git add reports/
+            git commit -m "Delete reports for $(date +'%Y-%m-%d')"
+            git push
+            echo "Reports deleted and pushed"
+          else
+            echo "No reports to delete"
+          fi
+
+  night-generate:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' && inputs.run_mode == 'night' ||
+      github.event_name == 'schedule' && github.event.schedule == '30 15 * * *'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfreetype6-dev libpng-dev libjpeg-dev git wget
+          wget -O ta-lib.deb https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib_0.6.4_amd64.deb
+          sudo dpkg -i ta-lib.deb || sudo apt-get install -f -y
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Generate r1 reports
+        run: |
+          if [ -n "${{ inputs.run_tag }}" ]; then
+            python backend/generate_reports.py --mode generate --run-tag "${{ inputs.run_tag }}"
+          else
+            python backend/generate_reports.py --mode generate --run-tag r1
+          fi
+
+      - name: Configure Git user
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Commit and push reports
+        run: |
+          if [ -n "$(git status --porcelain reports/)" ]; then
+            git add reports/
+            git commit -m "Add night r1 reports for $(date +'%Y-%m-%d')"
+            git push
+            echo "Reports successfully pushed to repository"
+          else
+            echo "No new reports generated"
+          fi
+
+      - name: Clean up temporary files
+        run: |
           rm -f backend/charts/* 2>/dev/null || true

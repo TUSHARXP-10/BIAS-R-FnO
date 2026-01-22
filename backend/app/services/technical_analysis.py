@@ -118,29 +118,57 @@ class TechnicalAnalyzer:
         """Generate trading signals based on indicators"""
         rsi = talib.RSI(self.close, timeperiod=14)[-1]
         macd, macd_signal, _ = talib.MACD(self.close, 12, 26, 9)
+        adx = talib.ADX(self.high, self.low, self.close, timeperiod=14)[-1]
         
         signals = []
         
-        # RSI signals
-        if rsi < 30:
-            signals.append(f"🟢 Oversold - Potential BUY signal (RSI: {rsi:.2f})")
-        elif rsi > 70:
-            signals.append(f"🔴 Overbought - Potential SELL signal (RSI: {rsi:.2f})")
-        else:
-            signals.append(f"🟡 Neutral RSI: {rsi:.2f}")
-        
-        # MACD signals
-        if macd[-1] > macd_signal[-1]:
-            signals.append("🟢 Bullish MACD crossover")
-        else:
-            signals.append("🔴 Bearish MACD crossover")
-        
-        # Trend signal
         trend = self.get_trend()
+        rsi_value = None if np.isnan(rsi) else float(rsi)
+        adx_value = None if np.isnan(adx) else float(adx)
+        macd_value = None if np.isnan(macd[-1]) else float(macd[-1])
+        macd_signal_value = None if np.isnan(macd_signal[-1]) else float(macd_signal[-1])
+
+        if adx_value is None:
+            signals.append("Trend strength unavailable")
+        elif adx_value < 20:
+            signals.append(f"Weak trend strength (ADX {adx_value:.2f}) → range-biased, avoid trend trades")
+        elif adx_value < 25:
+            signals.append(f"Moderate trend strength (ADX {adx_value:.2f}) → cautious trend-following")
+        else:
+            signals.append(f"Strong trend strength (ADX {adx_value:.2f}) → trend-following favorable")
+
         if trend == "Bullish":
-            signals.append("📈 Strong uptrend detected")
+            signals.append("Trend bias: Bullish")
         elif trend == "Bearish":
-            signals.append("📉 Strong downtrend detected")
+            signals.append("Trend bias: Bearish")
+        else:
+            signals.append("Trend bias: Neutral")
+
+        if rsi_value is not None:
+            if rsi_value < 30:
+                if adx_value is not None and adx_value < 20:
+                    signals.append(f"RSI oversold ({rsi_value:.2f}) but trend strength weak → wait")
+                else:
+                    signals.append(f"RSI oversold ({rsi_value:.2f}) supports bounce only with trend confirmation")
+            elif rsi_value > 70:
+                if adx_value is not None and adx_value < 20:
+                    signals.append(f"RSI overbought ({rsi_value:.2f}) but trend strength weak → avoid chasing")
+                else:
+                    signals.append(f"RSI overbought ({rsi_value:.2f}) warns of exhaustion in trend")
+            else:
+                signals.append(f"RSI neutral ({rsi_value:.2f})")
+
+        if macd_value is not None and macd_signal_value is not None:
+            if macd_value > macd_signal_value:
+                if adx_value is not None and adx_value < 20:
+                    signals.append("MACD bullish crossover but trend strength weak → lower weight")
+                else:
+                    signals.append("MACD bullish crossover supports trend bias")
+            else:
+                if adx_value is not None and adx_value < 20:
+                    signals.append("MACD bearish crossover but trend strength weak → lower weight")
+                else:
+                    signals.append("MACD bearish crossover supports trend bias")
         
         return signals
     

@@ -1,4 +1,10 @@
 # backend/tests/verify_accuracy.py
+import sys
+import os
+
+# Add the backend directory to the Python path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from app.services.data_fetcher import MarketDataFetcher
 from app.services.technical_analysis import TechnicalAnalyzer
 import talib

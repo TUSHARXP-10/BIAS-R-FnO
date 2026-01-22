@@ -6,6 +6,7 @@ This script is designed to be run by GitHub Actions or manually.
 
 import os
 import sys
+import argparse
 from datetime import datetime
 
 # Add the backend directory to the path so we can import modules
@@ -16,7 +17,7 @@ from app.services.technical_analysis import TechnicalAnalyzer
 from app.services.report_generator import ReportGenerator
 from app.services.chart_generator import ChartGenerator
 
-def generate_report_for_symbol(symbol, report_date, is_weekly=False):
+def generate_report_for_symbol(symbol, report_date, is_weekly=False, name_prefix=None):
     """Generate report for a single symbol."""
     print(f"Generating report for {symbol} on {report_date}...")
     
@@ -78,7 +79,7 @@ def generate_report_for_symbol(symbol, report_date, is_weekly=False):
         
         # Generate PDF
         report_generator = ReportGenerator()
-        pdf_path = report_generator.generate_pdf(report_data, is_weekly)
+        pdf_path = report_generator.generate_pdf(report_data, is_weekly, name_prefix)
         
         print(f"✅ Report generated for {symbol}: {pdf_path}")
         return pdf_path
@@ -88,7 +89,6 @@ def generate_report_for_symbol(symbol, report_date, is_weekly=False):
         return None
 
 def delete_old_reports(reports_dir, keep_latest_only=True):
-    """Delete all old reports, keeping only the latest ones."""
     if not os.path.exists(reports_dir):
         print(f"Reports directory not found: {reports_dir}")
         return 0
@@ -96,9 +96,7 @@ def delete_old_reports(reports_dir, keep_latest_only=True):
     print(f"Deleting old reports from: {reports_dir}")
     files_deleted = 0
     
-    # If we want to keep only the latest reports, delete all reports
     if keep_latest_only:
-        # Delete all report files
         for filename in os.listdir(reports_dir):
             file_path = os.path.join(reports_dir, filename)
             if os.path.isfile(file_path) and filename.endswith('.pdf'):
@@ -109,54 +107,64 @@ def delete_old_reports(reports_dir, keep_latest_only=True):
     return files_deleted
 
 def main():
-    """Main function to generate reports for all symbols."""
-    # Symbols to generate reports for
-    symbols = ['SENSEX', 'BANKNIFTY', 'NIFTY50']
-    
-    # Use today's date if no date is provided
+    return main_with_tag()
+
+def run_cleanup():
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    repo_reports_dir = os.path.join(repo_root, 'reports')
+    backend_reports_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports')
+    os.makedirs(repo_reports_dir, exist_ok=True)
+    os.makedirs(backend_reports_dir, exist_ok=True)
+    deleted_repo = delete_old_reports(repo_reports_dir)
+    deleted_backend = delete_old_reports(backend_reports_dir)
+    print(f"Cleanup complete. Repo deleted: {deleted_repo}, Backend deleted: {deleted_backend}")
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", choices=["generate", "cleanup"], default=os.getenv("REPORT_MODE", "generate"))
+    parser.add_argument("--run-tag", default=os.getenv("REPORT_TAG"))
+    return parser.parse_args()
+
+def run():
+    args = parse_args()
     report_date = datetime.now()
     current_day = report_date.strftime('%A').lower()
-    
-    # Ensure reports directory exists at repo root
+    if args.mode == "cleanup":
+        run_cleanup()
+        return []
+    if args.run_tag == "r1" and current_day in ["saturday", "sunday"]:
+        print("Skipping night run on weekend")
+        return []
+    return main_with_tag(args.run_tag)
+
+def main_with_tag(run_tag=None):
+    symbols = ['SENSEX', 'BANKNIFTY', 'NIFTY50']
+    report_date = datetime.now()
+    current_day = report_date.strftime('%A').lower()
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     repo_reports_dir = os.path.join(repo_root, 'reports')
     os.makedirs(repo_reports_dir, exist_ok=True)
-    
-    # Ensure backend reports directory exists
     backend_reports_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports')
     os.makedirs(backend_reports_dir, exist_ok=True)
-    
-    # Delete old reports from both directories every day, regardless of day
-    delete_old_reports(repo_reports_dir)
-    delete_old_reports(backend_reports_dir)
-    
-    print(f"Starting report generation...")
-    print(f"Report date: {report_date.strftime('%Y-%m-%d')}")
-    print(f"Reports will be saved to: {repo_reports_dir}")
-    
     generated_files = []
-    
-    if current_day in ['saturday', 'sunday']:
-        # On weekends, generate a consolidated weekly report
-        print(f"Generating weekly consolidated report for past 5 days...")
+    is_weekend = current_day in ['saturday', 'sunday']
+    if is_weekend:
+        print("Generating weekly consolidated report for past 5 days...")
         for symbol in symbols:
             pdf_path = generate_report_for_symbol(symbol, report_date, is_weekly=True)
             if pdf_path:
                 generated_files.append(pdf_path)
     else:
-        # On weekdays, generate daily reports
         print(f"Generating daily reports for: {', '.join(symbols)}")
         for symbol in symbols:
-            pdf_path = generate_report_for_symbol(symbol, report_date, is_weekly=False)
+            pdf_path = generate_report_for_symbol(symbol, report_date, is_weekly=False, name_prefix=run_tag)
             if pdf_path:
                 generated_files.append(pdf_path)
-    
-    print(f"\nReport generation complete!")
+    print("\nReport generation complete!")
     print(f"Generated {len(generated_files)} out of {len(symbols)} reports.")
     for file in generated_files:
         print(f"- {file}")
-    
     return generated_files
 
 if __name__ == "__main__":
-    main()
+    run()
