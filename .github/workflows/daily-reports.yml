@@ -78,6 +78,40 @@ jobs:
         run: |
           # Remove chart files if they're not needed
           rm -f backend/charts/* 2>/dev/null || true
+  sensex-trade:
+    needs: morning-generate
+    runs-on: ubuntu-latest
+    if: vars.TRADE_ENABLED == 'true'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements.txt
+      - name: Execute Sensex F&O trades
+        env:
+          CAPITAL: ${{ vars.CAPITAL }}
+          PREMIUM_MIN: ${{ vars.PREMIUM_MIN }}
+          PREMIUM_MAX: ${{ vars.PREMIUM_MAX }}
+          ALLOCATION_PCT: ${{ vars.ALLOCATION_PCT }}
+          MAX_SPREAD_PCT: ${{ vars.MAX_SPREAD_PCT }}
+          OI_CHANGE_PCT: ${{ vars.OI_CHANGE_PCT }}
+          SENSEX_LOT_SIZE: ${{ vars.SENSEX_LOT_SIZE }}
+          IS_EXPIRY_DAY: ${{ vars.IS_EXPIRY_DAY }}
+          OPTION_CHAIN_URL: ${{ vars.OPTION_CHAIN_URL }}
+          GROWW_ORDER_MODE: ${{ vars.GROWW_ORDER_MODE }}
+          GROWW_TOTP_SECRET: ${{ secrets.GROWW_TOTP_SECRET }}
+          GROWW_API_KEY: ${{ secrets.GROWW_API_KEY }}
+          GROWW_API_SECRET: ${{ secrets.GROWW_API_SECRET }}
+        run: |
+          python backend/scripts/execute_trades.py --index SENSEX
 
   evening-cleanup:
     runs-on: ubuntu-latest
