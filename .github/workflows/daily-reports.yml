@@ -91,7 +91,7 @@ jobs:
           PREMIUM_MAX: 65
           ALLOCATION_PCT: ${{ vars.ALLOCATION_PCT }}
           MAX_SPREAD_PCT: ${{ vars.MAX_SPREAD_PCT }}
-          OI_CHANGE_PCT: ${{ vars.OI_CHANGE_PCT }}
+          OI_CHANGE_PCT: 0.10
           SENSEX_LOT_SIZE: ${{ vars.SENSEX_LOT_SIZE }}
           IS_EXPIRY_DAY: ${{ vars.IS_EXPIRY_DAY }}
           OPTION_CHAIN_URL: ${{ vars.OPTION_CHAIN_URL }}
