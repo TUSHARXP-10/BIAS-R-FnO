@@ -22,3 +22,8 @@
 {"symbol": "BANKNIFTY", "date": "2026-01-21 17:18:47", "decision": "NO TRADE", "entry_price": 58800.3, "logged_at": "2026-01-21T17:18:50.212297"}
 {"symbol": "NIFTY50", "date": "2026-01-21 17:18:47", "decision": "NO TRADE", "entry_price": 25157.5, "logged_at": "2026-01-21T17:18:51.022093"}
 {"symbol": "BANKNIFTY", "date": "2026-01-21 17:24:40", "decision": "NO TRADE", "entry_price": 58800.3, "logged_at": "2026-01-21T17:24:42.317564"}
+{"symbol": "BANKNIFTY", "date": "2026-01-23 02:41:55", "decision": "NO TRADE", "entry_price": 59200.1, "logged_at": "2026-01-23T02:41:57.298897"}
+{"symbol": "RELIANCE.NS", "date": "2026-01-23 02:45:54", "decision": "NO TRADE", "entry_price": 1402.5, "logged_at": "2026-01-23T02:45:55.501622"}
+{"symbol": "TCS.NS", "date": "2026-01-23 02:45:57", "decision": "NO TRADE", "entry_price": 3150.4, "logged_at": "2026-01-23T02:45:58.456039"}
+{"symbol": "INFY.NS", "date": "2026-01-23 02:46:00", "decision": "LONG", "entry_price": 1663.5, "logged_at": "2026-01-23T02:46:01.399495"}
+{"symbol": "BANKNIFTY", "date": "2026-01-23 02:46:07", "decision": "NO TRADE", "entry_price": 59200.1, "logged_at": "2026-01-23T02:46:08.333720"}
