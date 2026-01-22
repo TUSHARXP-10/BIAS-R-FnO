@@ -6,6 +6,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 import os
 from datetime import datetime
 from app.services.signal_tracker import SignalTracker
+from app.services.ai_provider import OpenAIProvider
 
 class ReportGenerator:
     def generate_pdf(self, report_data, is_weekly=False, name_prefix=None):
@@ -93,6 +94,16 @@ class ReportGenerator:
         story.append(Paragraph(summary_text, styles['Normal']))
         story.append(Paragraph(f"Confidence Score: {tb.get('confidence', 'N/A')}/10", styles['Normal']))
         story.append(Spacer(1, 12))
+
+        try:
+            ai = OpenAIProvider()
+            ai_text = ai.explain_report(report_data)
+            if ai_text:
+                story.append(Paragraph("AI Commentary", styles['Heading2']))
+                story.append(Paragraph(ai_text, styles['Normal']))
+                story.append(Spacer(1, 10))
+        except Exception:
+            pass
 
         story.append(Paragraph("Key Levels", styles['Heading2']))
         story.append(Paragraph(f"Resistance: {sr.get('resistance', 'N/A')}", styles['Normal']))

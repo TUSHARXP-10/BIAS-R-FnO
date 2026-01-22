@@ -8,9 +8,12 @@ import os
 import sys
 import argparse
 from datetime import datetime
+from dotenv import load_dotenv
 
 # Add the backend directory to the path so we can import modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+load_dotenv()
 
 from app.services.data_fetcher import MarketDataFetcher
 from app.services.technical_analysis import TechnicalAnalyzer
