@@ -1,6 +1,8 @@
 import requests
+import pytest
 import time
 
+@pytest.mark.parametrize("symbol", ["RELIANCE.NS", "TCS.NS", "INFY.NS"])
 def test_symbol(symbol):
     url = 'http://localhost:5000/api/reports/generate'
     payload = {
@@ -52,14 +54,3 @@ def test_invalid_symbol():
                 print(f"❌ Unexpected success for FAKESYMBOL")
     except Exception as e:
         print(f"❌ Exception: {str(e)}")
-
-if __name__ == "__main__":
-    print("Starting Edge Case Tests...")
-    
-    # Test Indian Stocks
-    test_symbol('RELIANCE.NS')
-    test_symbol('TCS.NS')
-    test_symbol('INFY.NS')
-    
-    # Test Invalid
-    test_invalid_symbol()
