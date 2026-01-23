@@ -47,6 +47,8 @@ jobs:
           pip install --upgrade pip
           pip install -r backend/requirements.txt
       - name: Generate reports
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           python backend/generate_reports.py --mode generate
       - name: Configure Git user
@@ -162,6 +164,8 @@ jobs:
           pip install --upgrade pip
           pip install -r backend/requirements.txt
       - name: Generate r1 reports
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           if [ -n "${{ inputs.run_tag }}" ]; then
             python backend/generate_reports.py --mode generate --run-tag "${{ inputs.run_tag }}"
