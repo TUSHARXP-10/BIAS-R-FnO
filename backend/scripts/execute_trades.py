@@ -49,11 +49,9 @@ def fetch_option_chain(url: str):
         # Check if response is HTML or JSON
         content_type = r.headers.get('Content-Type', '')
         if 'text/html' in content_type or url.endswith('.html'):
-            print("Warning: URL is an HTML page, not a JSON API. Fetching dummy data for testing.")
-            return [
-                {"symbol": "SENSEX24JAN120000CE", "premium": 60.5, "oi_change_pct": 0.15, "spread_pct": 0.01},
-                {"symbol": "SENSEX24JAN120500PE", "premium": 55.2, "oi_change_pct": 0.12, "spread_pct": 0.01}
-            ]
+            print("Warning: URL is an HTML page. HTML parsing is not yet implemented.")
+            print("To fix this, provide a JSON API URL or update the parser for BSE HTML.")
+            return []
             
         data = r.json()
         contracts = data.get("contracts", [])
