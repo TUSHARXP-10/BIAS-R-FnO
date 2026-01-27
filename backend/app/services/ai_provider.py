@@ -18,17 +18,15 @@ class OpenAIProvider:
             prompt = (
                 f"Market Data for {symbol}:\n"
                 f"- Trend: {report_data.get('trend','Neutral')}\n"
-                f"- Decision: {ap.get('decision','N/A')}\n"
-                f"- Reason: {ap.get('reason','')}\n"
-                f"- RSI: {indicators.get('rsi', 'N/A')}\n"
-                f"- ADX: {indicators.get('adx', 'N/A')}\n"
-                f"- Current Price: ₹{indicators.get('current_price', 'N/A')}\n"
-                f"- Resistance: ₹{report_data.get('support_resistance', {}).get('resistance', 'N/A')}\n"
-                f"- Support: ₹{report_data.get('support_resistance', {}).get('support', 'N/A')}\n\n"
-                f"Task: Provide a high-conviction, professional market analysis (3-4 sentences). "
-                f"Focus on what the indicators are telling us right now. "
-                f"If the decision is 'NO TRADE', explain the specific criteria (like ADX or price levels) that must be met for a setup to emerge. "
-                f"Avoid generic phrases. Be direct and technical."
+                f"- Current Price: {indicators.get('current_price')}\n"
+                f"- RSI: {indicators.get('rsi')} | ADX: {indicators.get('adx')}\n"
+                f"- MACD: {indicators.get('macd')} | MACD Signal: {indicators.get('macd_signal')}\n"
+                f"- Bollinger: Upper {indicators.get('bb_upper')} | Lower {indicators.get('bb_lower')}\n"
+                f"- Market Regime: {mr.get('regime','')} ({mr.get('description','')})\n"
+                f"- Decision: {ap.get('decision','N/A')} | Reason: {ap.get('reason','')}\n\n"
+                f"Write a highly professional, concise (3-4 sentences) technical commentary for a trading report. "
+                f"If the decision is 'NO TRADE', explain the specific technical triggers (e.g., ADX > 20, breakout above {report_data.get('support_resistance',{}).get('resistance')}) "
+                f"that must occur for a trade to be considered. Use a direct, institutional tone. No fluff."
             )
             resp = client.chat.completions.create(
                 model="gpt-4o-mini",

@@ -140,13 +140,26 @@ def run():
     args = parse_args()
     report_date = datetime.now()
     current_day = report_date.strftime('%A').lower()
+    
+    # Always clean up old reports before generating new ones to avoid "mess"
+    run_cleanup()
+    
     if args.mode == "cleanup":
-        run_cleanup()
+        # If only cleanup was requested, we are done
         return []
+        
     if args.run_tag == "r1" and current_day in ["saturday", "sunday"]:
         print("Skipping night run on weekend")
         return []
-    return main_with_tag(args.run_tag)
+    
+    generated_files = main_with_tag(args.run_tag)
+    
+    # Fail with error code if no reports were generated during a generate run
+    if not generated_files:
+        print("❌ Error: No reports were generated!")
+        sys.exit(1)
+        
+    return generated_files
 
 def main_with_tag(run_tag=None):
     symbols = ['SENSEX', 'BANKNIFTY', 'NIFTY50']
