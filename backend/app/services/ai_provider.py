@@ -24,15 +24,18 @@ class OpenAIProvider:
                 f"- Bollinger: Upper {indicators.get('bb_upper')} | Lower {indicators.get('bb_lower')}\n"
                 f"- Market Regime: {mr.get('regime','')} ({mr.get('description','')})\n"
                 f"- Decision: {ap.get('decision','N/A')} | Reason: {ap.get('reason','')}\n\n"
-                f"Write a highly professional, concise (3-4 sentences) technical commentary for a trading report. "
-                f"If the decision is 'NO TRADE', explain the specific technical triggers (e.g., ADX > 20, breakout above {report_data.get('support_resistance',{}).get('resistance')}) "
-                f"that must occur for a trade to be considered. Use a direct, institutional tone. No fluff."
+                f"Write a professional, direct technical commentary.\n"
+                f"If decision is 'NO TRADE', list exact triggers to activate a setup:\n"
+                f"1) ADX threshold and expansion requirement\n"
+                f"2) Breakout above resistance {report_data.get('support_resistance',{}).get('resistance')} or breakdown below support {report_data.get('support_resistance',{}).get('support')}\n"
+                f"3) Confirmation using MACD direction/crossover and RSI state\n"
+                f"Keep it concise and action-focused."
             )
             resp = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=180,
+                temperature=0.1,
+                max_tokens=320,
             )
             return resp.choices[0].message.content.strip()
         except Exception:
