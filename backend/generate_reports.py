@@ -99,12 +99,20 @@ def delete_old_reports(reports_dir, keep_latest_only=True):
     print(f"Deleting old reports from: {reports_dir}")
     files_deleted = 0
     
-    if keep_latest_only:
-        for filename in os.listdir(reports_dir):
-            file_path = os.path.join(reports_dir, filename)
-            if os.path.isfile(file_path) and filename.endswith('.pdf'):
+    # Symbols we generate reports for
+    symbols = ['SENSEX', 'BANKNIFTY', 'NIFTY50']
+    
+    for filename in os.listdir(reports_dir):
+        file_path = os.path.join(reports_dir, filename)
+        if os.path.isfile(file_path) and filename.endswith('.pdf'):
+            # If we want to keep the latest, we should ideally check dates
+            # But for simplicity and to avoid clutter, we delete all PDFs 
+            # and let the generator create fresh ones.
+            try:
                 os.remove(file_path)
                 files_deleted += 1
+            except Exception as e:
+                print(f"Error deleting {filename}: {e}")
     
     print(f"Deleted {files_deleted} old reports.")
     return files_deleted

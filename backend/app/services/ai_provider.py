@@ -16,12 +16,19 @@ class OpenAIProvider:
             mr = report_data.get("market_regime", {})
             symbol = report_data.get("symbol", "")
             prompt = (
-                f"Symbol: {symbol}\n"
-                f"Decision: {ap.get('decision','N/A')} | Reason: {ap.get('reason','')}\n"
-                f"Trend: {report_data.get('trend','')} | RSI: {indicators.get('rsi')} | ADX: {indicators.get('adx')}\n"
-                f"Regime: {mr.get('regime','')} {mr.get('description','')}\n"
-                f"Write a concise 3–4 sentence explanation suitable for a trading report. "
-                f"Emphasize deterministic rules and avoid advice."
+                f"Market Data for {symbol}:\n"
+                f"- Trend: {report_data.get('trend','Neutral')}\n"
+                f"- Decision: {ap.get('decision','N/A')}\n"
+                f"- Reason: {ap.get('reason','')}\n"
+                f"- RSI: {indicators.get('rsi', 'N/A')}\n"
+                f"- ADX: {indicators.get('adx', 'N/A')}\n"
+                f"- Current Price: ₹{indicators.get('current_price', 'N/A')}\n"
+                f"- Resistance: ₹{report_data.get('support_resistance', {}).get('resistance', 'N/A')}\n"
+                f"- Support: ₹{report_data.get('support_resistance', {}).get('support', 'N/A')}\n\n"
+                f"Task: Provide a high-conviction, professional market analysis (3-4 sentences). "
+                f"Focus on what the indicators are telling us right now. "
+                f"If the decision is 'NO TRADE', explain the specific criteria (like ADX or price levels) that must be met for a setup to emerge. "
+                f"Avoid generic phrases. Be direct and technical."
             )
             resp = client.chat.completions.create(
                 model="gpt-4o-mini",

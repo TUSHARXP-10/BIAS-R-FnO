@@ -57,12 +57,13 @@ jobs:
           git config user.email "actions@github.com"
       - name: Commit and push reports
         run: |
-          if [ -n "$(git status --porcelain reports/)" ]; then
-            git add reports/
+          # Use a more robust way to detect changes including deletions
+          git add reports/
+          if ! git diff --cached --quiet; then
             git commit -m "Add morning reports for $(date +'%Y-%m-%d')"
             git push
           else
-            echo "No new reports generated"
+            echo "No changes in reports directory"
           fi
       - name: Clean up temporary files
         run: |
@@ -131,12 +132,12 @@ jobs:
           git config user.email "actions@github.com"
       - name: Commit and push cleanup
         run: |
-          if [ -n "$(git status --porcelain reports/)" ]; then
-            git add reports/
+          git add reports/
+          if ! git diff --cached --quiet; then
             git commit -m "Delete reports for $(date +'%Y-%m-%d')"
             git push
           else
-            echo "No reports to delete"
+            echo "No reports to delete or directory already clean"
           fi
 
   night-generate:
@@ -178,12 +179,12 @@ jobs:
           git config user.email "actions@github.com"
       - name: Commit and push reports
         run: |
-          if [ -n "$(git status --porcelain reports/)" ]; then
-            git add reports/
+          git add reports/
+          if ! git diff --cached --quiet; then
             git commit -m "Add night r1 reports for $(date +'%Y-%m-%d')"
             git push
           else
-            echo "No new reports generated"
+            echo "No changes in reports directory"
           fi
       - name: Clean up temporary files
         run: |
