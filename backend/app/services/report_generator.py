@@ -120,26 +120,28 @@ class ReportGenerator:
         # --- EXECUTIVE SUMMARY DASHBOARD ---
         ap = report_data.get('action_plan', {})
         decision = ap.get('decision', 'N/A')
+        verdict = ap.get('verdict', 'Stay Flat')
         
         # Determine Status Color
         status_color = colors.grey
         if decision == "LONG": status_color = colors.green
         elif decision == "SHORT": status_color = colors.red
+        elif decision == "RANGE TRADE": status_color = colors.blue
         elif decision == "NO TRADE": status_color = colors.orange
         
         # Create a dashboard table
         data = [
             [
                 Paragraph("<b>ACTION SIGNAL</b>", self.styles['DashLabel']),
-                Paragraph("<b>TREND</b>", self.styles['DashLabel']),
+                Paragraph("<b>VERDICT</b>", self.styles['DashLabel']),
                 Paragraph("<b>REGIME</b>", self.styles['DashLabel']),
                 Paragraph("<b>CONFIDENCE</b>", self.styles['DashLabel'])
             ],
             [
                 Paragraph(f"<font color='{status_color.hexval()}'><b>{decision}</b></font>", self.styles['DashValue']),
-                Paragraph(report_data.get('trend', 'Neutral'), self.styles['DashValue']),
-                Paragraph(report_data.get('market_regime', {}).get('regime', 'N/A'), self.styles['DashValue']),
-                Paragraph(f"{report_data.get('trade_bias', {}).get('confidence', 'N/A')}/10", self.styles['DashValue'])
+                Paragraph(f"<b>{verdict}</b>", self.styles['DashValue']),
+                Paragraph(ap.get('regime', 'N/A'), self.styles['DashValue']),
+                Paragraph(f"{ap.get('confidence', 0)}/100", self.styles['DashValue'])
             ]
         ]
         
@@ -212,13 +214,17 @@ class ReportGenerator:
         
         indicators = report_data.get('indicators', {})
         sr = report_data.get('support_resistance', {})
+        pivots = ap.get('pivots', {})
         
         # Setup Table
         setup_data = [
             ["Parameter", "Value", "Condition"],
             ["Current Price", f"₹{indicators.get('current_price', 'N/A')}", "-"],
-            ["Resistance", f"₹{sr.get('resistance', 'N/A')}", "Breakout Level"],
-            ["Support", f"₹{sr.get('support', 'N/A')}", "Breakdown Level"],
+            ["Intraday Pivot", f"₹{pivots.get('pivot', 'N/A')}" if pivots else "N/A", "Magnet Level"],
+            ["Exec. Resistance (R1)", f"₹{pivots.get('r1', 'N/A')}" if pivots else "N/A", "Intraday Sell Zone"],
+            ["Exec. Support (S1)", f"₹{pivots.get('s1', 'N/A')}" if pivots else "N/A", "Intraday Buy Zone"],
+            ["Context Resistance", f"₹{sr.get('resistance', 'N/A')}", "Daily Breakout Level"],
+            ["Context Support", f"₹{sr.get('support', 'N/A')}", "Daily Breakdown Level"],
             ["ADX (Strength)", f"{indicators.get('adx', 'N/A')}", "Target > 20"],
             ["RSI (Momentum)", f"{indicators.get('rsi', 'N/A')}", "30 < RSI < 70"]
         ]
@@ -233,13 +239,15 @@ class ReportGenerator:
         story.append(setup_table)
         story.append(Spacer(1, 10))
         
-        if decision in ["LONG", "SHORT"]:
+        if decision in ["LONG", "SHORT", "RANGE TRADE"]:
             story.append(Paragraph("🎯 EXECUTABLE PLAN", self.styles['SubHeader']))
             plan_text = f"""
-            <b>ENTRY:</b> {ap.get('entry_condition', 'N/A')}<br/>
-            <b>STOP LOSS:</b> {ap.get('stop_loss', 'N/A')}<br/>
-            <b>TARGET 1:</b> {ap.get('target_1', 'N/A')}<br/>
-            <b>TARGET 2:</b> {ap.get('target_2', 'N/A')}
+            <b>STRATEGY:</b> {verdict}<br/>
+            <b>RECOMMENDED STRIKES:</b> {ap.get('strikes', 'N/A')}<br/>
+            <b>ENTRY ZONE:</b> {ap.get('entry_condition', 'N/A')}<br/>
+            <b>STOP LOSS:</b> ₹{ap.get('stop_loss', 'N/A')} (Strict)<br/>
+            <b>TARGETS:</b> ₹{ap.get('target_1', 'N/A')} / ₹{ap.get('target_2', 'N/A')}<br/>
+            <b>INVALIDATION:</b> {ap.get('invalidation', 'N/A')}
             """
             p = Paragraph(plan_text, self.styles['Normal'])
             # Put in a box

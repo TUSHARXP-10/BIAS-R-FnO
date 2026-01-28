@@ -194,98 +194,387 @@ class TechnicalAnalyzer:
             'average': int(avg_volume)
         }
 
-    def get_support_resistance(self):
-        """Calculate support and resistance levels (last 20 candles)"""
-        recent_highs = self.high[-20:]
-        recent_lows = self.low[-20:]
+    def calculate_pivot_points(self):
+        """Calculate Standard Pivot Points for Intraday Levels (using last complete candle)"""
+        if len(self.close) < 2:
+            return None
+            
+        high = self.high[-1]
+        low = self.low[-1]
+        close = self.close[-1]
         
-        resistance = round(float(np.max(recent_highs)), 2)
-        support = round(float(np.min(recent_lows)), 2)
+        pivot = (high + low + close) / 3
+        r1 = (2 * pivot) - low
+        s1 = (2 * pivot) - high
+        r2 = pivot + (high - low)
+        s2 = pivot - (high - low)
+        r3 = high + 2 * (pivot - low)
+        s3 = low - 2 * (high - pivot)
         
         return {
-            'resistance': resistance,
-            'support': support
+            'pivot': round(float(pivot), 2),
+            'r1': round(float(r1), 2),
+            's1': round(float(s1), 2),
+            'r2': round(float(r2), 2),
+            's2': round(float(s2), 2),
+            'r3': round(float(r3), 2),
+            's3': round(float(s3), 2)
         }
-    
-    def _risk_reward(self, entry_price, target_price, stop_price):
-        try:
-            r = abs(entry_price - stop_price)
-            rr = abs(target_price - entry_price) / r if r > 0 else None
-            return round(float(rr), 2) if rr is not None else None
-        except Exception:
+
+    def calculate_confidence_score(self, trend, adx, rsi, vol_surge):
+        """
+        Compute a confidence score (0-100) based on weighted factors.
+        
+        Weights:
+        - Trend Alignment: 30
+        - Trend Strength (ADX): 25
+        - Momentum (RSI): 25
+        - Volume Support: 20
+        """
+        score = 0
+        details = []
+        
+        # 1. Trend Alignment (30 pts)
+        if trend in ["Bullish", "Bearish"]:
+            score += 30
+            details.append("Trend Aligned (+30)")
+        else:
+            score += 10 # Partial credit for stability
+            details.append("Trend Neutral (+10)")
+            
+        # 2. Trend Strength (ADX) (25 pts)
+        if adx > 25:
+            score += 25
+            details.append(f"Strong ADX {adx:.1f} (+25)")
+        elif adx > 20:
+            score += 15
+            details.append(f"Moderate ADX {adx:.1f} (+15)")
+        else:
+            score += 5
+            details.append(f"Weak ADX {adx:.1f} (+5)")
+            
+        # 3. Momentum (RSI) (25 pts)
+        # Bullish context
+        if trend == "Bullish":
+            if 40 <= rsi <= 70: 
+                score += 25
+                details.append("RSI Bullish Zone (+25)")
+            elif rsi > 70:
+                score += 10
+                details.append("RSI Overbought (+10)")
+            else:
+                score += 5
+                details.append("RSI Weak (+5)")
+        # Bearish context
+        elif trend == "Bearish":
+            if 30 <= rsi <= 60:
+                score += 25
+                details.append("RSI Bearish Zone (+25)")
+            elif rsi < 30:
+                score += 10
+                details.append("RSI Oversold (+10)")
+            else:
+                score += 5
+                details.append("RSI Weak (+5)")
+        # Neutral context
+        else:
+            if 40 <= rsi <= 60:
+                score += 25
+                details.append("RSI Range Stable (+25)")
+            else:
+                score += 10
+        
+        # 4. Volume Support (20 pts)
+        if vol_surge:
+            score += 20
+            details.append("Volume Surge (+20)")
+        else:
+            score += 10
+            details.append("Volume Normal (+10)")
+            
+        return score, details
+
+    def get_market_regime(self):
+        indicators = self.calculate_all_indicators()
+        trend = self.get_trend()
+        adx = indicators.get('adx')
+        current_price = indicators.get('current_price')
+        atr = indicators.get('atr')
+        
+        if any(v is None for v in [adx, current_price, atr]):
+            return {'regime': 'Unknown', 'description': 'Insufficient data'}
+            
+        atr_pct = (atr / current_price) * 100
+        
+        # Strict Regime Definitions
+        if adx > 25:
+            if atr_pct < 2.0:
+                regime = "Strong Trend"
+                description = f"Clean {trend} movement"
+            else:
+                regime = "Volatile Trend"
+                description = f"Choppy {trend} movement"
+        elif adx < 20:
+            regime = "Range-Bound"
+            description = "Sideways / Consolidation"
+        else:
+            regime = "Weak Trend"
+            description = f"Drifting {trend}"
+            
+        return {'regime': regime, 'description': description}
+
+    def get_support_resistance(self):
+        """Calculate Context Support and Resistance (Daily Timeframe)"""
+        # Context Levels (HTF) - 20 day High/Low
+        if len(self.close) < 20:
+             return {'support': self._safe_float(min(self.low)), 'resistance': self._safe_float(max(self.high))}
+             
+        recent_high = max(self.high[-20:])
+        recent_low = min(self.low[-20:])
+        
+        return {
+            'support': self._safe_float(recent_low),
+            'resistance': self._safe_float(recent_high)
+        }
+
+    def get_candlestick_patterns(self):
+        """Identify key candlestick patterns"""
+        patterns = []
+        # Engulfing
+        engulfing = talib.CDLENGULFING(self.open, self.high, self.low, self.close)
+        if engulfing[-1] == 100: patterns.append("Bullish Engulfing")
+        elif engulfing[-1] == -100: patterns.append("Bearish Engulfing")
+        
+        # Hammer
+        hammer = talib.CDLHAMMER(self.open, self.high, self.low, self.close)
+        if hammer[-1] == 100: patterns.append("Hammer")
+        
+        # Shooting Star
+        star = talib.CDLSHOOTINGSTAR(self.open, self.high, self.low, self.close)
+        if star[-1] == -100: patterns.append("Shooting Star")
+        
+        # Doji
+        doji = talib.CDLDOJI(self.open, self.high, self.low, self.close)
+        if doji[-1] == 100: patterns.append("Doji")
+        
+        return patterns if patterns else ["No significant pattern"]
+
+    def get_risk_context(self):
+        """Analyze volatility and risk environment"""
+        indicators = self.calculate_all_indicators()
+        atr = indicators.get('atr')
+        current_price = indicators.get('current_price')
+        
+        if not atr or not current_price:
+            return {'volatility': 'Unknown', 'atr': 0, 'atr_percentage': 0}
+            
+        atr_pct = (atr / current_price) * 100
+        
+        if atr_pct > 2.0:
+            volatility = "High"
+        elif atr_pct > 1.0:
+            volatility = "Moderate"
+        else:
+            volatility = "Low"
+            
+        return {
+            'volatility': volatility,
+            'atr': atr,
+            'atr_percentage': round(atr_pct, 2)
+        }
+
+    def get_trade_bias(self):
+        """Legacy wrapper for confidence score to support existing calls"""
+        trend = self.get_trend()
+        indicators = self.calculate_all_indicators()
+        vol_ctx = self.get_volume_context()
+        
+        score, _ = self.calculate_confidence_score(
+            trend, 
+            indicators.get('adx'), 
+            indicators.get('rsi'), 
+            vol_ctx['surge']
+        )
+        
+        return {
+            'bias': trend,
+            'confidence': score,
+            'strength': 'Strong' if score > 60 else 'Weak'
+        }
+
+    def _risk_reward(self, entry, target, stop):
+        """Calculate Risk-Reward Ratio"""
+        if not all([entry, target, stop]):
             return None
-    
+        # Ensure all inputs are numbers
+        try:
+            entry = float(entry)
+            target = float(target)
+            stop = float(stop)
+        except (ValueError, TypeError):
+            return None
+            
+        risk = abs(entry - stop)
+        reward = abs(target - entry)
+        if risk == 0: return 0
+        return round(reward / risk, 2)
+
+    def recommend_strikes(self, current_price, decision, step=100):
+        """Recommend specific Option Strikes based on decision"""
+        if decision not in ["LONG", "SHORT"]:
+            return "N/A"
+            
+        # Round to nearest step (e.g., 100 for Nifty/Sensex approx)
+        atm = round(current_price / step) * step
+        
+        if decision == "LONG":
+            # Bullish: Buy ATM or slightly OTM Call
+            return f"Buy CE: {atm} (ATM) or {atm + step} (OTM)"
+        elif decision == "SHORT":
+            # Bearish: Buy ATM or slightly OTM Put
+            return f"Buy PE: {atm} (ATM) or {atm - step} (OTM)"
+        return "N/A"
+
     def generate_actionable_plan(self):
         indicators = self.calculate_all_indicators()
-        sr = self.get_support_resistance()
+        sr = self.get_support_resistance() # Context Levels (Daily)
+        pivots = self.calculate_pivot_points() # Execution Levels (Intraday)
         trend = self.get_trend()
+        
         rsi = indicators.get('rsi')
         adx = indicators.get('adx')
         ema_20 = indicators.get('ema_20')
         current_price = indicators.get('current_price')
-        support = sr.get('support')
-        resistance = sr.get('resistance')
         vol_ctx = self.get_volume_context()
         
-        if any(v is None for v in [rsi, adx, ema_20, current_price, support, resistance]):
+        # 1. Get Regime FIRST (Regime Lock)
+        regime_data = self.get_market_regime()
+        regime = regime_data['regime']
+        
+        if any(v is None for v in [rsi, adx, ema_20, current_price]):
             return {
                 'decision': 'NO TRADE',
                 'reason': 'Insufficient data',
-                'entry_condition': 'Do not enter',
-                'target_1': None,
-                'target_2': None,
-                'stop_loss': None,
-                'invalidation': f"Wait for ADX > 20 or breakout of ₹{support}-₹{resistance}",
-                'risk_reward': None
+                'entry_condition': 'N/A',
+                'target_1': None, 'target_2': None, 'stop_loss': None,
+                'invalidation': 'N/A', 'risk_reward': None,
+                'regime': 'Unknown', 'confidence': 0, 'strikes': 'N/A',
+                'verdict': 'Data Insufficient'
             }
 
-        # Enhanced Decision Logic:
-        # 1. Trend confirmation (Relaxed EMA)
-        # 2. ADX expansion (Trend strength)
-        # 3. Volume surge (Confirmation)
-        # 4. Breakout of recent S/R
+        # 2. Compute Confidence
+        confidence_score, confidence_details = self.calculate_confidence_score(
+            trend, adx, rsi, vol_ctx['surge']
+        )
         
-        is_breakout_up = current_price > resistance
-        is_breakout_down = current_price < support
+        # 3. Decision Logic based on Regime
+        decision = "NO TRADE"
+        entry_condition = "Wait"
+        target_1 = target_2 = stop_loss = None
+        invalidation = "N/A"
+        reason = "N/A"
+        verdict = "Stay Flat"
         
-        if (trend == "Bullish" or is_breakout_up) and adx > 18 and rsi < 75:
-            decision = "LONG"
-            entry_condition = f"Above ₹{max(ema_20, resistance):.2f}"
-            target_1 = round(current_price * 1.01, 2)
-            target_2 = round(current_price * 1.02, 2)
-            stop_loss = support
-            invalidation = f"Below ₹{support:.2f}"
-            reason = f"{'Breakout' if is_breakout_up else 'Trend'} confirmed (ADX {adx:.1f}, Vol Ratio {vol_ctx['ratio']})"
-            rr = self._risk_reward(current_price, target_1, stop_loss)
-            
-        elif (trend == "Bearish" or is_breakout_down) and adx > 18 and rsi > 25:
-            decision = "SHORT"
-            entry_condition = f"Below ₹{min(ema_20, support):.2f}"
-            target_1 = round(current_price * 0.99, 2)
-            target_2 = round(current_price * 0.98, 2)
-            stop_loss = resistance
-            invalidation = f"Above ₹{resistance:.2f}"
-            reason = f"{'Breakdown' if is_breakout_down else 'Trend'} confirmed (ADX {adx:.1f}, Vol Ratio {vol_ctx['ratio']})"
-            rr = self._risk_reward(current_price, target_1, stop_loss)
-            
+        # Default Execution Levels (Pivots preferred for intraday)
+        if pivots:
+            exec_pivot = pivots['pivot']
+            exec_r1 = pivots['r1']
+            exec_s1 = pivots['s1']
+            exec_r2 = pivots['r2']
+            exec_s2 = pivots['s2']
+            exec_r3 = pivots['r3']
+            exec_s3 = pivots['s3']
         else:
-            decision = "NO TRADE"
-            entry_condition = "Do not enter"
-            target_1 = None
-            target_2 = None
-            stop_loss = None
-            invalidation = f"Wait for ADX > 20 or breakout of ₹{support}-₹{resistance}"
+            # Fallback if no pivots (should be rare with sufficient data)
+            exec_pivot = (sr['resistance'] + sr['support']) / 2
+            exec_r1 = sr['resistance']
+            exec_s1 = sr['support']
+            # Estimate wider levels based on % difference
+            diff = exec_r1 - exec_s1
+            exec_r2 = exec_r1 + diff
+            exec_s2 = exec_s1 - diff
+            exec_r3 = exec_r2 + diff
+            exec_s3 = exec_s2 - diff
+
+        # LOGIC CORE
+        if regime in ["Strong Trend", "Volatile Trend"]:
+            # Trend Following
+            if trend == "Bullish":
+                if confidence_score > 60:
+                    decision = "LONG"
+                    # Entry: Pullback to Pivot or Breakout of R1
+                    entry_condition = f"Pullback to {exec_pivot:.0f} or Breakout > {exec_r1:.0f}"
+                    stop_loss = round(exec_s1, 2)
+                    target_1 = round(exec_r2, 2)
+                    target_2 = round(exec_r3, 2)
+                    invalidation = f"Close below {exec_s1:.0f}"
+                    reason = f"Bullish Trend (Score {confidence_score})"
+                    verdict = "BUY DIPS or BREAKOUT"
+                else:
+                    decision = "NO TRADE"
+                    reason = f"Bullish but low confidence ({confidence_score})"
+                    verdict = "WATCHLIST ONLY (Weak Confidence)"
+                    
+            elif trend == "Bearish":
+                if confidence_score > 60:
+                    decision = "SHORT"
+                    entry_condition = f"Pullback to {exec_pivot:.0f} or Breakdown < {exec_s1:.0f}"
+                    stop_loss = round(exec_r1, 2)
+                    target_1 = round(exec_s2, 2)
+                    target_2 = round(exec_s3, 2)
+                    invalidation = f"Close above {exec_r1:.0f}"
+                    reason = f"Bearish Trend (Score {confidence_score})"
+                    verdict = "SELL RALLIES or BREAKDOWN"
+                else:
+                    decision = "NO TRADE"
+                    reason = f"Bearish but low confidence ({confidence_score})"
+                    verdict = "WATCHLIST ONLY (Weak Confidence)"
+                    
+        elif regime == "Range-Bound":
+            # Range Trading
+            if confidence_score > 50: # Lower threshold for range
+                decision = "RANGE TRADE"
+                entry_condition = f"Buy near {exec_s1:.0f} / Sell near {exec_r1:.0f}"
+                stop_loss = round(exec_s2, 2) # Wide stop for range fade? Or tight?
+                # Let's use tight stop for range fade
+                # Buy S1, Stop slightly below S1. Sell R1, Stop slightly above R1.
+                # Simplified for report:
+                stop_loss = "Tight (0.5%)" 
+                target_1 = round(exec_pivot, 2)
+                target_2 = round(exec_r1 if trend=="Bullish" else exec_s1, 2)
+                invalidation = "Range Breakout"
+                reason = "Market consolidating (Low ADX)"
+                verdict = "PLAY THE EDGES (Fade highs/lows)"
+            else:
+                decision = "NO TRADE"
+                reason = "Choppy / No clear boundaries"
+                verdict = "STAY FLAT (Choppy)"
+                
+        elif regime == "Weak Trend":
+             decision = "NO TRADE"
+             reason = "Trend too weak, momentum absent"
+             verdict = "STAY FLAT (Waiting for Momentum)"
+             
+        # 4. Safety Check: R:R & Inversions
+        # Ensure SL is closer than Target 1 for directional trades
+        if decision in ["LONG", "SHORT"] and stop_loss and target_1:
+            dist_target = abs(target_1 - current_price)
+            dist_stop = abs(current_price - stop_loss)
             
-            # Detailed reason for NO TRADE
-            reasons = []
-            if adx <= 18: reasons.append(f"weak trend (ADX {adx:.1f})")
-            if rsi >= 75: reasons.append("overbought RSI")
-            if rsi <= 25: reasons.append("oversold RSI")
-            if not (is_breakout_up or is_breakout_down): reasons.append("inside range")
-            
-            reason = f"No clear trigger: {', '.join(reasons)}" if reasons else "Choppy conditions"
-            rr = None
-            
+            # If SL is wider than Target, force adjustment or kill trade
+            if dist_stop > dist_target:
+                 # Adjust SL to be tighter (e.g., recent swing or 0.5%)
+                 # Or simply downgrade to NO TRADE if no logical tight stop exists
+                 # Here we will tighten SL to 1:1.5 implied
+                 if decision == "LONG":
+                     stop_loss = round(current_price - (dist_target / 1.5), 2)
+                 else:
+                     stop_loss = round(current_price + (dist_target / 1.5), 2)
+                 invalidation = f"Tightened SL: {stop_loss}"
+
+        rr = self._risk_reward(current_price, target_1, stop_loss) if target_1 and stop_loss else None
+        strikes = self.recommend_strikes(current_price, decision, step=100) # Assuming Sensex/Nifty step
+
         return {
             'decision': decision,
             'reason': reason,
@@ -294,158 +583,14 @@ class TechnicalAnalyzer:
             'target_2': target_2,
             'stop_loss': stop_loss,
             'invalidation': invalidation,
-            'risk_reward': rr
+            'risk_reward': rr,
+            'regime': regime,
+            'confidence': confidence_score,
+            'confidence_details': confidence_details,
+            'verdict': verdict,
+            'strikes': strikes,
+            'pivots': pivots
         }
-    
-    def get_candlestick_patterns(self):
-        """Detect candlestick patterns"""
-        patterns = []
-        
-        # Doji
-        if talib.CDLDOJI(self.open, self.high, self.low, self.close)[-1] != 0:
-            patterns.append("Doji")
-        
-        # Hammer
-        if talib.CDLHAMMER(self.open, self.high, self.low, self.close)[-1] != 0:
-            patterns.append("Hammer")
-        
-        # Shooting Star
-        if talib.CDLSHOOTINGSTAR(self.open, self.high, self.low, self.close)[-1] != 0:
-            patterns.append("Shooting Star")
-        
-        # Engulfing
-        engulfing = talib.CDLENGULFING(self.open, self.high, self.low, self.close)[-1]
-        if engulfing > 0:
-            patterns.append("Bullish Engulfing")
-        elif engulfing < 0:
-            patterns.append("Bearish Engulfing")
-        
-        return patterns if patterns else ["No significant patterns detected"]
-
-    def get_trade_bias(self):
-        plan = self.generate_actionable_plan()
-        indicators = self.calculate_all_indicators()
-        sr = self.get_support_resistance()
-        trend = self.get_trend()
-        current_price = indicators.get('current_price')
-        adx = indicators.get('adx')
-        rsi = indicators.get('rsi')
-        
-        if plan['decision'] == 'LONG':
-            primary_bias = 'LONG'
-            stance = 'Long'
-            confidence = 8
-            invalidation = sr.get('support')
-            confirmation = sr.get('resistance')
-            execution = f"Enter {plan['entry_condition']}. Targets: ₹{plan['target_1']} / ₹{plan['target_2']}. SL: ₹{plan['stop_loss']}."
-        elif plan['decision'] == 'SHORT':
-            primary_bias = 'SHORT'
-            stance = 'Short'
-            confidence = 8
-            invalidation = sr.get('resistance')
-            confirmation = sr.get('support')
-            execution = f"Enter {plan['entry_condition']}. Targets: ₹{plan['target_1']} / ₹{plan['target_2']}. SL: ₹{plan['stop_loss']}."
-        else:
-            primary_bias = 'NO TRADE'
-            stance = 'No trade'
-            # Calculate confidence based on actual market conditions
-            if adx and adx < 15:
-                confidence = 2
-                reason = f"Very weak trend strength (ADX: {adx:.1f})"
-            elif adx and 15 <= adx <= 20:
-                confidence = 3
-                reason = f"Weak trend strength (ADX: {adx:.1f})"
-            elif rsi and (rsi < 40 or rsi > 60):
-                confidence = 4
-                reason = f"RSI extreme ({rsi:.1f}) but no clear trend"
-            else:
-                confidence = 3
-                reason = f"Choppy market conditions"
-            
-            invalidation = sr.get('support')
-            confirmation = sr.get('resistance')
-            
-            # More detailed execution plan with actual values
-            execution = f"Do not enter. {reason}. "
-            if adx:
-                execution += f"Current ADX: {adx:.1f} (wait for ADX > 20). "
-            execution += f"Price range: ₹{current_price:.2f} between support (₹{sr['support']}) and resistance (₹{sr['resistance']}). "
-            execution += f"Wait for clear breakout above ₹{sr['resistance']} (for LONG) or below ₹{sr['support']} (for SHORT)."
-        return {
-            'primary_bias': primary_bias,
-            'stance': stance,
-            'confidence': confidence,
-            'invalidation': invalidation,
-            'confirmation': confirmation,
-            'execution': execution
-        }
-
-    def get_risk_context(self):
-        indicators = self.calculate_all_indicators()
-        atr = indicators.get('atr')
-        adx = indicators.get('adx')
-        current_price = indicators.get('current_price')
-        if atr is None or current_price is None or adx is None:
-            return {
-                'atr': atr,
-                'atr_percentage': None,
-                'volatility': "Unknown",
-                'sizing_advice': "Insufficient data",
-                'adx': adx,
-                'trend_strength': "Unknown",
-                'trend_advice': "Gather more data"
-            }
-        atr_pct = (atr / current_price) * 100
-        if atr_pct > 2:
-            volatility = "High"
-            sizing_advice = "Reduce position size, wider stops needed"
-        elif atr_pct > 1:
-            volatility = "Moderate"
-            sizing_advice = "Normal position sizing acceptable"
-        else:
-            volatility = "Low"
-            sizing_advice = "Can use tighter stops, standard sizing"
-        if adx > 25:
-            trend_strength = "Strong"
-            trend_advice = "Trend-following strategies favorable"
-        elif adx > 20:
-            trend_strength = "Moderate"
-            trend_advice = "Mixed signals, use caution"
-        else:
-            trend_strength = "Weak"
-            trend_advice = "Range-bound likely, avoid trend trades"
-        return {
-            'atr': round(float(atr), 2),
-            'atr_percentage': round(float(atr_pct), 2),
-            'volatility': volatility,
-            'sizing_advice': sizing_advice,
-            'adx': round(float(adx), 2),
-            'trend_strength': trend_strength,
-            'trend_advice': trend_advice
-        }
-
-    def get_market_regime(self):
-        indicators = self.calculate_all_indicators()
-        trend = self.get_trend()
-        adx = indicators.get('adx')
-        current_price = indicators.get('current_price')
-        atr = indicators.get('atr')
-        if adx is None or current_price is None or atr is None:
-            return {'regime': 'Unknown', 'description': 'Insufficient data'}
-        atr_pct = (atr / current_price) * 100
-        if adx > 25 and atr_pct < 1.5:
-            regime = "Strong Trend"
-            description = "Trending cleanly"
-        elif adx > 25 and atr_pct > 2:
-            regime = "Volatile Trend"
-            description = "Trending but choppy"
-        elif adx < 20 and atr_pct < 1.5:
-            regime = "Range-Bound"
-            description = "Low volatility consolidation"
-        else:
-            regime = "Weak Trend / Range-biased"
-            description = f"with {trend.lower()} tilt"
-        return {'regime': regime, 'description': description}
 
     def get_position_sizing(self):
         risk_context = self.get_risk_context()
