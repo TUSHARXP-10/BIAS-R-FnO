@@ -102,14 +102,20 @@ class TechnicalAnalyzer:
         return indicators
     
     def get_trend(self):
-        """Determine market trend"""
-        ema_20 = talib.EMA(self.close, timeperiod=20)[-1]
-        ema_50 = talib.EMA(self.close, timeperiod=50)[-1]
-        current_price = self.close[-1]
+        """Relaxed trend classification"""
+        indicators = self.calculate_all_indicators()
+        current_price = indicators.get('current_price')
+        ema_20 = indicators.get('ema_20')
+        ema_50 = indicators.get('ema_50')
         
-        if current_price > ema_20 > ema_50:
+        if any(v is None for v in [current_price, ema_20, ema_50]):
+            return "Neutral"
+            
+        # Relaxed Bullish: Price above EMA 20, or EMA 20 above EMA 50
+        if current_price > ema_20:
             return "Bullish"
-        elif current_price < ema_20 < ema_50:
+        # Relaxed Bearish: Price below EMA 20, or EMA 20 below EMA 50
+        elif current_price < ema_20:
             return "Bearish"
         else:
             return "Neutral"
@@ -172,6 +178,22 @@ class TechnicalAnalyzer:
         
         return signals
     
+    def get_volume_context(self):
+        """Analyze volume relative to recent average"""
+        if self.volume is None or len(self.volume) < 20:
+            return {'surge': False, 'ratio': 1.0}
+            
+        avg_volume = np.mean(self.volume[-20:])
+        current_volume = self.volume[-1]
+        surge_ratio = current_volume / avg_volume if avg_volume > 0 else 1.0
+        
+        return {
+            'surge': surge_ratio > 1.2,  # 20% surge
+            'ratio': round(float(surge_ratio), 2),
+            'current': int(current_volume),
+            'average': int(avg_volume)
+        }
+
     def get_support_resistance(self):
         """Calculate support and resistance levels (last 20 candles)"""
         recent_highs = self.high[-20:]
@@ -203,6 +225,8 @@ class TechnicalAnalyzer:
         current_price = indicators.get('current_price')
         support = sr.get('support')
         resistance = sr.get('resistance')
+        vol_ctx = self.get_volume_context()
+        
         if any(v is None for v in [rsi, adx, ema_20, current_price, support, resistance]):
             return {
                 'decision': 'NO TRADE',
@@ -214,24 +238,36 @@ class TechnicalAnalyzer:
                 'invalidation': f"Wait for ADX > 20 or breakout of ₹{support}-₹{resistance}",
                 'risk_reward': None
             }
-        if trend == "Bullish" and adx > 20 and rsi < 70:
+
+        # Enhanced Decision Logic:
+        # 1. Trend confirmation (Relaxed EMA)
+        # 2. ADX expansion (Trend strength)
+        # 3. Volume surge (Confirmation)
+        # 4. Breakout of recent S/R
+        
+        is_breakout_up = current_price > resistance
+        is_breakout_down = current_price < support
+        
+        if (trend == "Bullish" or is_breakout_up) and adx > 18 and rsi < 75:
             decision = "LONG"
-            entry_condition = f"Above ₹{ema_20:.2f} with 5-min close"
-            target_1 = resistance
-            target_2 = round(resistance * 1.005, 2)
+            entry_condition = f"Above ₹{max(ema_20, resistance):.2f}"
+            target_1 = round(current_price * 1.01, 2)
+            target_2 = round(current_price * 1.02, 2)
             stop_loss = support
             invalidation = f"Below ₹{support:.2f}"
-            reason = f"Strong {trend.lower()} trend (ADX {adx})"
-            rr = self._risk_reward(ema_20, target_1, stop_loss)
-        elif trend == "Bearish" and adx > 20 and rsi > 30:
+            reason = f"{'Breakout' if is_breakout_up else 'Trend'} confirmed (ADX {adx:.1f}, Vol Ratio {vol_ctx['ratio']})"
+            rr = self._risk_reward(current_price, target_1, stop_loss)
+            
+        elif (trend == "Bearish" or is_breakout_down) and adx > 18 and rsi > 25:
             decision = "SHORT"
-            entry_condition = f"Below ₹{ema_20:.2f} with 5-min close"
-            target_1 = support
-            target_2 = round(support * 0.995, 2)
+            entry_condition = f"Below ₹{min(ema_20, support):.2f}"
+            target_1 = round(current_price * 0.99, 2)
+            target_2 = round(current_price * 0.98, 2)
             stop_loss = resistance
             invalidation = f"Above ₹{resistance:.2f}"
-            reason = f"Strong {trend.lower()} trend (ADX {adx})"
-            rr = self._risk_reward(ema_20, target_1, stop_loss)
+            reason = f"{'Breakdown' if is_breakout_down else 'Trend'} confirmed (ADX {adx:.1f}, Vol Ratio {vol_ctx['ratio']})"
+            rr = self._risk_reward(current_price, target_1, stop_loss)
+            
         else:
             decision = "NO TRADE"
             entry_condition = "Do not enter"
@@ -239,8 +275,17 @@ class TechnicalAnalyzer:
             target_2 = None
             stop_loss = None
             invalidation = f"Wait for ADX > 20 or breakout of ₹{support}-₹{resistance}"
-            reason = f"Weak/choppy conditions (ADX {adx})"
+            
+            # Detailed reason for NO TRADE
+            reasons = []
+            if adx <= 18: reasons.append(f"weak trend (ADX {adx:.1f})")
+            if rsi >= 75: reasons.append("overbought RSI")
+            if rsi <= 25: reasons.append("oversold RSI")
+            if not (is_breakout_up or is_breakout_down): reasons.append("inside range")
+            
+            reason = f"No clear trigger: {', '.join(reasons)}" if reasons else "Choppy conditions"
             rr = None
+            
         return {
             'decision': decision,
             'reason': reason,

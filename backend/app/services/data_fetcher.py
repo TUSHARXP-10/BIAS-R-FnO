@@ -7,7 +7,15 @@ class MarketDataFetcher:
         'BANKNIFTY': '^NSEBANK',
         'NIFTY': '^NSEI',
         'SENSEX': '^BSESN',
-        'NIFTY50': '^NSEI'
+        'NIFTY50': '^NSEI',
+        'INDIAVIX': '^INDIAVIX'
+    }
+
+    GLOBAL_SYMBOLS = {
+        'S&P 500': '^GSPC',
+        'NASDAQ': '^IXIC',
+        'NIKKEI': '^N225',
+        'HANG SENG': '^HSI'
     }
     
     def fetch_data(self, symbol, period='3mo'):
@@ -40,3 +48,36 @@ class MarketDataFetcher:
         """Get latest price for a symbol"""
         data = self.fetch_data(symbol, period='1d')
         return data['Close'].iloc[-1]
+
+    def get_market_summary(self):
+        """
+        Fetch summary of global and domestic indices.
+        Returns a dictionary with symbol, price, and percent change.
+        """
+        summary = {}
+        all_symbols = {**self.INDIAN_SYMBOLS, **self.GLOBAL_SYMBOLS}
+        
+        for name, symbol in all_symbols.items():
+            try:
+                # Fetch 5d to ensure we have previous close even after weekends/holidays
+                ticker = yf.Ticker(symbol)
+                hist = ticker.history(period="5d")
+                
+                if not hist.empty:
+                    current_close = hist['Close'].iloc[-1]
+                    prev_close = hist['Close'].iloc[-2] if len(hist) > 1 else current_close
+                    change = current_close - prev_close
+                    change_pct = (change / prev_close) * 100
+                    
+                    summary[name] = {
+                        "current": current_close,
+                        "change": change,
+                        "change_pct": change_pct
+                    }
+                else:
+                    summary[name] = None
+            except Exception as e:
+                print(f"Error fetching summary for {name}: {e}")
+                summary[name] = None
+                
+        return summary

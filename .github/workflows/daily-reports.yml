@@ -52,6 +52,11 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r backend/requirements.txt
+      - name: Generate Daily Sentiment
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python backend/scripts/generate_daily_sentiment.py
       - name: Generate reports
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

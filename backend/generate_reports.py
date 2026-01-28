@@ -7,6 +7,7 @@ This script is designed to be run by GitHub Actions or manually.
 import os
 import sys
 import argparse
+import json
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -19,6 +20,18 @@ from app.services.data_fetcher import MarketDataFetcher
 from app.services.technical_analysis import TechnicalAnalyzer
 from app.services.report_generator import ReportGenerator
 from app.services.chart_generator import ChartGenerator
+from app.services.ml_service import LightGBMService, OptionDecayService
+
+def get_daily_sentiment():
+    """Load the daily sentiment from the JSON file."""
+    try:
+        sentiment_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'daily_sentiment.json')
+        if os.path.exists(sentiment_path):
+            with open(sentiment_path, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Warning: Could not load daily sentiment: {e}")
+    return None
 
 def generate_report_for_symbol(symbol, report_date, is_weekly=False, name_prefix=None):
     """Generate report for a single symbol."""
@@ -44,6 +57,16 @@ def generate_report_for_symbol(symbol, report_date, is_weekly=False, name_prefix
         overall_signal = analyzer.get_overall_signal()
         action_plan = analyzer.generate_actionable_plan()
         
+        # Machine Learning Prediction
+        lgbm_service = LightGBMService()
+        ml_prediction = lgbm_service.predict(symbol, market_data)
+        ml_importance = lgbm_service.get_feature_importance(symbol)
+
+        # Option Decay Insights (Experimental)
+        decay_service = OptionDecayService()
+        decay_prob = None
+        decay_importance = None
+        
         if is_weekly:
             timeframe = {
                 'data_period': '1 month daily data',
@@ -61,10 +84,13 @@ def generate_report_for_symbol(symbol, report_date, is_weekly=False, name_prefix
         chart_generator = ChartGenerator()
         chart_path = chart_generator.generate_chart(symbol, market_data, indicators, support_resistance)
 
+        # Load Daily Sentiment
+        daily_sentiment = get_daily_sentiment()
+
         # Prepare report data
         report_data = {
             'symbol': symbol,
-            'date': report_date.strftime('%Y-%m-%d %H:%M:%S'),
+            'date': report_date.strftime('%Y-%m-%d'),
             'indicators': indicators,
             'trend': trend,
             'signals': signals,
@@ -77,7 +103,12 @@ def generate_report_for_symbol(symbol, report_date, is_weekly=False, name_prefix
             'market_regime': market_regime,
             'position_sizing': position_sizing,
             'overall_signal': overall_signal,
-            'action_plan': action_plan
+            'action_plan': action_plan,
+            'ml_prediction': ml_prediction,
+            'ml_importance': ml_importance,
+            'option_decay_prob': decay_prob,
+            'option_decay_importance': decay_importance,
+            'daily_sentiment': daily_sentiment
         }
         
         # Generate PDF
@@ -91,28 +122,33 @@ def generate_report_for_symbol(symbol, report_date, is_weekly=False, name_prefix
         print(f"❌ Error generating report for {symbol}: {str(e)}")
         return None
 
-def delete_old_reports(reports_dir, keep_latest_only=True):
+def delete_old_reports(reports_dir, keep_latest_count=0):
     if not os.path.exists(reports_dir):
         print(f"Reports directory not found: {reports_dir}")
         return 0
     
     print(f"Deleting old reports from: {reports_dir}")
     files_deleted = 0
-    
-    # Symbols we generate reports for
+
     symbols = ['SENSEX', 'BANKNIFTY', 'NIFTY50']
-    
-    for filename in os.listdir(reports_dir):
-        file_path = os.path.join(reports_dir, filename)
-        if os.path.isfile(file_path) and filename.endswith('.pdf'):
-            # If we want to keep the latest, we should ideally check dates
-            # But for simplicity and to avoid clutter, we delete all PDFs 
-            # and let the generator create fresh ones.
+    pdfs = [f for f in os.listdir(reports_dir) if f.endswith('.pdf')]
+    by_symbol = {s: [] for s in symbols}
+    for f in pdfs:
+        for s in symbols:
+            if f.startswith(f"report_{s}_") or f.startswith(f"weekly_report_{s}_") or f.startswith(f"r1_{s}_"):
+                by_symbol[s].append(f)
+                break
+
+    for s, files in by_symbol.items():
+        files_full = [os.path.join(reports_dir, f) for f in files]
+        files_full.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        to_delete = files_full[keep_latest_count:] if keep_latest_count > 0 else files_full
+        for p in to_delete:
             try:
-                os.remove(file_path)
+                os.remove(p)
                 files_deleted += 1
             except Exception as e:
-                print(f"Error deleting {filename}: {e}")
+                print(f"Error deleting {os.path.basename(p)}: {e}")
     
     print(f"Deleted {files_deleted} old reports.")
     return files_deleted
@@ -126,8 +162,9 @@ def run_cleanup():
     backend_reports_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'reports')
     os.makedirs(repo_reports_dir, exist_ok=True)
     os.makedirs(backend_reports_dir, exist_ok=True)
-    deleted_repo = delete_old_reports(repo_reports_dir)
-    deleted_backend = delete_old_reports(backend_reports_dir)
+    keep_latest = int(os.getenv("REPORTS_KEEP_LATEST", "3"))
+    deleted_repo = delete_old_reports(repo_reports_dir, keep_latest_count=keep_latest)
+    deleted_backend = delete_old_reports(backend_reports_dir, keep_latest_count=keep_latest)
     print(f"Cleanup complete. Repo deleted: {deleted_repo}, Backend deleted: {deleted_backend}")
 
 def parse_args():
