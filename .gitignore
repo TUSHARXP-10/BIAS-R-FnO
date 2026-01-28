@@ -8,9 +8,12 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+backend/.env
 
 # Generated files
 backend/charts/
+backend/data/
+reports/
 
 # Signals
 backend/signals/
