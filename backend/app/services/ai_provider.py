@@ -24,18 +24,19 @@ class OpenAIProvider:
                 f"- Bollinger: Upper {indicators.get('bb_upper')} | Lower {indicators.get('bb_lower')}\n"
                 f"- Market Regime: {mr.get('regime','')} ({mr.get('description','')})\n"
                 f"- Decision: {ap.get('decision','N/A')} | Reason: {ap.get('reason','')}\n\n"
-                f"Write a professional, direct technical commentary.\n"
-                f"If decision is 'NO TRADE', list exact triggers to activate a setup:\n"
-                f"1) ADX threshold and expansion requirement\n"
-                f"2) Breakout above resistance {report_data.get('support_resistance',{}).get('resistance')} or breakdown below support {report_data.get('support_resistance',{}).get('support')}\n"
-                f"3) Confirmation using MACD direction/crossover and RSI state\n"
-                f"Keep it concise and action-focused."
+                f"Write a professional, dashing, and elaborate technical commentary.\n"
+                f"For SENSEX, specifically mention how the setup aligns with global cues and bank stocks if applicable.\n"
+                f"Structure the response in 3 bullet points:\n"
+                f"1. **Market Structure**: Explain the trend and key levels.\n"
+                f"2. **Momentum & Volatility**: Analyze RSI/ADX and VIX implication.\n"
+                f"3. **Actionable Trade Setup**: Explicitly state entry, stop-loss, and target zones.\n"
+                f"If decision is 'NO TRADE', explain why patience is profitable here."
             )
             resp = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.1,
-                max_tokens=320,
+                temperature=0.3,
+                max_tokens=500,
             )
             return resp.choices[0].message.content.strip()
         except Exception:
