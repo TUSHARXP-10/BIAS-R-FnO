@@ -102,7 +102,7 @@ class TechnicalAnalyzer:
         return indicators
     
     def get_trend(self):
-        """Relaxed trend classification"""
+        """Tighter trend classification using EMA alignment"""
         indicators = self.calculate_all_indicators()
         current_price = indicators.get('current_price')
         ema_20 = indicators.get('ema_20')
@@ -110,12 +110,11 @@ class TechnicalAnalyzer:
         
         if any(v is None for v in [current_price, ema_20, ema_50]):
             return "Neutral"
-            
-        # Relaxed Bullish: Price above EMA 20, or EMA 20 above EMA 50
-        if current_price > ema_20:
+        
+        # Stronger alignment criteria
+        if current_price > ema_20 and ema_20 > ema_50:
             return "Bullish"
-        # Relaxed Bearish: Price below EMA 20, or EMA 20 below EMA 50
-        elif current_price < ema_20:
+        elif current_price < ema_20 and ema_20 < ema_50:
             return "Bearish"
         else:
             return "Neutral"
@@ -195,13 +194,12 @@ class TechnicalAnalyzer:
         }
 
     def calculate_pivot_points(self):
-        """Calculate Standard Pivot Points for Intraday Levels (using last complete candle)"""
         if len(self.close) < 2:
             return None
-            
-        high = self.high[-1]
-        low = self.low[-1]
-        close = self.close[-1]
+        idx = -2 if len(self.close) >= 2 else -1
+        high = self.high[idx]
+        low = self.low[idx]
+        close = self.close[idx]
         
         pivot = (high + low + close) / 3
         r1 = (2 * pivot) - low
@@ -219,6 +217,25 @@ class TechnicalAnalyzer:
             's2': round(float(s2), 2),
             'r3': round(float(r3), 2),
             's3': round(float(s3), 2)
+        }
+
+    def calculate_cpr_levels(self):
+        """Central Pivot Range (CPR) using previous day OHLC (popular in India)"""
+        if len(self.close) < 2:
+            return None
+        idx = -2 if len(self.close) >= 2 else -1
+        high = float(self.high[idx])
+        low = float(self.low[idx])
+        close = float(self.close[idx])
+        pivot = (high + low + close) / 3.0
+        bc = (high + low) / 2.0
+        tc = (2 * pivot) - bc
+        width = tc - bc
+        return {
+            'pivot': round(pivot, 2),
+            'bc': round(bc, 2),
+            'tc': round(tc, 2),
+            'width': round(width, 2)
         }
 
     def calculate_confidence_score(self, trend, adx, rsi, vol_surge):
@@ -475,39 +492,37 @@ class TechnicalAnalyzer:
         reason = "N/A"
         verdict = "Stay Flat"
         
-        # Default Execution Levels (Pivots preferred for intraday)
-        if pivots:
-            exec_pivot = pivots['pivot']
-            exec_r1 = pivots['r1']
-            exec_s1 = pivots['s1']
-            exec_r2 = pivots['r2']
-            exec_s2 = pivots['s2']
-            exec_r3 = pivots['r3']
-            exec_s3 = pivots['s3']
+        # Execution boundaries: Prefer CPR (TC/BC). Targets: standard pivots.
+        if self.calculate_cpr_levels():
+            cpr = self.calculate_cpr_levels()
+            exec_pivot = cpr['pivot']
+            exec_upper = cpr['tc']
+            exec_lower = cpr['bc']
         else:
-            # Fallback if no pivots (should be rare with sufficient data)
             exec_pivot = (sr['resistance'] + sr['support']) / 2
-            exec_r1 = sr['resistance']
-            exec_s1 = sr['support']
-            # Estimate wider levels based on % difference
-            diff = exec_r1 - exec_s1
-            exec_r2 = exec_r1 + diff
-            exec_s2 = exec_s1 - diff
-            exec_r3 = exec_r2 + diff
-            exec_s3 = exec_s2 - diff
+            exec_upper = sr['resistance']
+            exec_lower = sr['support']
+        if pivots:
+            exec_r1 = pivots['r1']; exec_r2 = pivots['r2']; exec_r3 = pivots['r3']
+            exec_s1 = pivots['s1']; exec_s2 = pivots['s2']; exec_s3 = pivots['s3']
+        else:
+            diff = exec_upper - exec_lower
+            exec_r1 = exec_upper; exec_s1 = exec_lower
+            exec_r2 = exec_r1 + diff; exec_s2 = exec_s1 - diff
+            exec_r3 = exec_r2 + diff; exec_s3 = exec_s2 - diff
 
         # LOGIC CORE
         if regime in ["Strong Trend", "Volatile Trend"]:
             # Trend Following
             if trend == "Bullish":
-                if confidence_score > 60:
+                if confidence_score > 65:
                     decision = "LONG"
-                    # Entry: Pullback to Pivot or Breakout of R1
-                    entry_condition = f"Pullback to {exec_pivot:.0f} or Breakout > {exec_r1:.0f}"
-                    stop_loss = round(exec_s1, 2)
+                    # Entry aligned to CPR boundaries
+                    entry_condition = f"Breakout > {exec_upper:.0f} or Pullback to {exec_pivot:.0f}"
+                    stop_loss = round(exec_lower, 2)
                     target_1 = round(exec_r2, 2)
                     target_2 = round(exec_r3, 2)
-                    invalidation = f"Close below {exec_s1:.0f}"
+                    invalidation = f"Close below {exec_lower:.0f}"
                     reason = f"Bullish Trend (Score {confidence_score})"
                     verdict = "BUY DIPS or BREAKOUT"
                 else:
@@ -516,13 +531,13 @@ class TechnicalAnalyzer:
                     verdict = "WATCHLIST ONLY (Weak Confidence)"
                     
             elif trend == "Bearish":
-                if confidence_score > 60:
+                if confidence_score > 65:
                     decision = "SHORT"
-                    entry_condition = f"Pullback to {exec_pivot:.0f} or Breakdown < {exec_s1:.0f}"
-                    stop_loss = round(exec_r1, 2)
+                    entry_condition = f"Breakdown < {exec_lower:.0f} or Pullback to {exec_pivot:.0f}"
+                    stop_loss = round(exec_upper, 2)
                     target_1 = round(exec_s2, 2)
                     target_2 = round(exec_s3, 2)
-                    invalidation = f"Close above {exec_r1:.0f}"
+                    invalidation = f"Close above {exec_upper:.0f}"
                     reason = f"Bearish Trend (Score {confidence_score})"
                     verdict = "SELL RALLIES or BREAKDOWN"
                 else:
@@ -534,14 +549,10 @@ class TechnicalAnalyzer:
             # Range Trading
             if confidence_score > 50: # Lower threshold for range
                 decision = "RANGE TRADE"
-                entry_condition = f"Buy near {exec_s1:.0f} / Sell near {exec_r1:.0f}"
-                stop_loss = round(exec_s2, 2) # Wide stop for range fade? Or tight?
-                # Let's use tight stop for range fade
-                # Buy S1, Stop slightly below S1. Sell R1, Stop slightly above R1.
-                # Simplified for report:
+                entry_condition = f"Buy near {exec_lower:.0f} / Sell near {exec_upper:.0f}"
                 stop_loss = "Tight (0.5%)" 
                 target_1 = round(exec_pivot, 2)
-                target_2 = round(exec_r1 if trend=="Bullish" else exec_s1, 2)
+                target_2 = round(exec_upper if trend=="Bullish" else exec_lower, 2)
                 invalidation = "Range Breakout"
                 reason = "Market consolidating (Low ADX)"
                 verdict = "PLAY THE EDGES (Fade highs/lows)"
@@ -555,6 +566,57 @@ class TechnicalAnalyzer:
              reason = "Trend too weak, momentum absent"
              verdict = "STAY FLAT (Waiting for Momentum)"
              
+        # 3.1 Pivot Gate: avoid countertrend entries
+        if decision == "LONG" and current_price is not None and exec_pivot is not None:
+            if current_price <= exec_pivot:
+                decision = "NO TRADE"
+                reason = f"Price below pivot ({exec_pivot}) → avoid countertrend long"
+                verdict = "STAY FLAT (Below Pivot)"
+                target_1 = target_2 = stop_loss = None
+                invalidation = "N/A"
+        if decision == "SHORT" and current_price is not None and exec_pivot is not None:
+            if current_price >= exec_pivot:
+                decision = "NO TRADE"
+                reason = f"Price above pivot ({exec_pivot}) → avoid countertrend short"
+                verdict = "STAY FLAT (Above Pivot)"
+                target_1 = target_2 = stop_loss = None
+                invalidation = "N/A"
+        
+        # 3.2 Momentum Gate: align RSI with direction near actionable zones
+        if decision == "LONG" and rsi is not None:
+            if rsi < 50:
+                decision = "NO TRADE"
+                reason = f"RSI {rsi:.1f} < 50 → momentum not supportive for long"
+                verdict = "STAY FLAT (Weak Momentum)"
+                target_1 = target_2 = stop_loss = None
+                invalidation = "N/A"
+        if decision == "SHORT" and rsi is not None:
+            if rsi > 50:
+                decision = "NO TRADE"
+                reason = f"RSI {rsi:.1f} > 50 → momentum not supportive for short"
+                verdict = "STAY FLAT (Weak Momentum)"
+                target_1 = target_2 = stop_loss = None
+                invalidation = "N/A"
+
+        # 3.3 EMA slope gate: require slope alignment with direction
+        if decision in ["LONG", "SHORT"]:
+            ema20_series = talib.EMA(self.close, timeperiod=20)
+            ema50_series = talib.EMA(self.close, timeperiod=50)
+            ema20_slope = float(ema20_series[-1] - ema20_series[-2]) if not np.isnan(ema20_series[-1]) and not np.isnan(ema20_series[-2]) else 0.0
+            ema50_slope = float(ema50_series[-1] - ema50_series[-2]) if not np.isnan(ema50_series[-1]) and not np.isnan(ema50_series[-2]) else 0.0
+            if decision == "LONG" and (ema20_slope <= 0 or ema50_slope <= 0):
+                decision = "NO TRADE"
+                reason = "EMA slopes not supportive for long"
+                verdict = "STAY FLAT (Slope Mismatch)"
+                target_1 = target_2 = stop_loss = None
+                invalidation = "N/A"
+            if decision == "SHORT" and (ema20_slope >= 0 or ema50_slope >= 0):
+                decision = "NO TRADE"
+                reason = "EMA slopes not supportive for short"
+                verdict = "STAY FLAT (Slope Mismatch)"
+                target_1 = target_2 = stop_loss = None
+                invalidation = "N/A"
+
         # 4. Safety Check: R:R & Inversions
         # Ensure SL is closer than Target 1 for directional trades
         if decision in ["LONG", "SHORT"] and stop_loss and target_1:

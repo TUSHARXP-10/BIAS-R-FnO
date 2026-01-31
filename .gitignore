@@ -17,6 +17,7 @@ reports/
 
 # Signals
 backend/signals/
+signals/
 
 # Instance files (Flask)
 backend/instance/
