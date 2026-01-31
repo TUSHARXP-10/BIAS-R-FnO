@@ -112,8 +112,9 @@ class ChartGenerator:
         ax3.plot(dates, signal, label='Signal', color='orange', linewidth=1.5)
         
         # Color histogram bars
-        hist_colors = ['green' if h >= 0 else 'red' for h in hist]
-        ax3.bar(dates, hist, color=hist_colors, alpha=0.5, width=width)
+        hist_safe = np.nan_to_num(hist, nan=0.0, posinf=0.0, neginf=0.0)
+        hist_colors = ['green' if h >= 0 else 'red' for h in hist_safe]
+        ax3.bar(dates, hist_safe, color=hist_colors, alpha=0.5, width=width)
         
         ax3.axhline(0, color='black', linewidth=0.5)
         ax3.set_ylabel('MACD', fontsize=12)

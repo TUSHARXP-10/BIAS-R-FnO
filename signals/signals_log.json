@@ -7,3 +7,23 @@
 {"symbol": "SENSEX", "date": "2026-01-29", "decision": "SHORT", "entry_price": 82344.68, "logged_at": "2026-01-29T00:38:32.798386"}
 {"symbol": "BANKNIFTY", "date": "2026-01-29", "decision": "NO TRADE", "entry_price": 59598.8, "logged_at": "2026-01-29T00:38:41.441458"}
 {"symbol": "NIFTY50", "date": "2026-01-29", "decision": "SHORT", "entry_price": 25342.75, "logged_at": "2026-01-29T00:38:49.573129"}
+{"symbol": "SENSEX", "date": "2026-01-29", "decision": "SHORT", "entry_price": 82344.68, "logged_at": "2026-01-29T01:12:28.212708"}
+{"symbol": "NIFTY50", "date": "2026-01-29", "decision": "SHORT", "entry_price": 25342.75, "logged_at": "2026-01-29T01:12:30.752133"}
+{"symbol": "SENSEX", "date": "2026-01-29", "decision": "SHORT", "entry_price": 82344.68, "logged_at": "2026-01-29T01:12:57.656776"}
+{"symbol": "BANKNIFTY", "date": "2026-01-29", "decision": "RANGE TRADE", "entry_price": 59598.8, "logged_at": "2026-01-29T01:12:58.843933"}
+{"symbol": "NIFTY50", "date": "2026-01-29", "decision": "SHORT", "entry_price": 25342.75, "logged_at": "2026-01-29T01:12:59.860676"}
+{"symbol": "SENSEX", "date": "2026-01-29", "decision": "NO TRADE", "entry_price": 82166.1, "logged_at": "2026-01-29T12:40:31.048487"}
+{"symbol": "BANKNIFTY", "date": "2026-01-29", "decision": "RANGE TRADE", "entry_price": 59760.5, "logged_at": "2026-01-29T12:40:31.963183"}
+{"symbol": "NIFTY50", "date": "2026-01-29", "decision": "NO TRADE", "entry_price": 25289.4, "logged_at": "2026-01-29T12:40:32.803783"}
+{"symbol": "SENSEX", "date": "2026-01-30", "decision": "NO TRADE", "entry_price": 82269.78, "logged_at": "2026-01-30T22:28:23.580168"}
+{"symbol": "BANKNIFTY", "date": "2026-01-30", "decision": "RANGE TRADE", "entry_price": 59610.45, "logged_at": "2026-01-30T22:28:24.634068"}
+{"symbol": "NIFTY50", "date": "2026-01-30", "decision": "NO TRADE", "entry_price": 25320.65, "logged_at": "2026-01-30T22:28:25.731694"}
+{"symbol": "SENSEX", "date": "2026-01-30", "decision": "SHORT", "entry_price": 82269.78, "logged_at": "2026-01-30T22:41:59.708788"}
+{"symbol": "BANKNIFTY", "date": "2026-01-30", "decision": "RANGE TRADE", "entry_price": 59610.45, "logged_at": "2026-01-30T22:42:00.639386"}
+{"symbol": "NIFTY50", "date": "2026-01-30", "decision": "SHORT", "entry_price": 25320.65, "logged_at": "2026-01-30T22:42:01.474833"}
+{"symbol": "SENSEX", "date": "2026-01-30", "decision": "SHORT", "entry_price": 82269.78, "logged_at": "2026-01-30T22:57:38.959756"}
+{"symbol": "BANKNIFTY", "date": "2026-01-30", "decision": "RANGE TRADE", "entry_price": 59610.45, "logged_at": "2026-01-30T22:57:39.908708"}
+{"symbol": "NIFTY50", "date": "2026-01-30", "decision": "SHORT", "entry_price": 25320.65, "logged_at": "2026-01-30T22:57:40.768743"}
+{"symbol": "SENSEX", "date": "2026-01-31", "decision": "NO TRADE", "entry_price": 82269.78, "logged_at": "2026-01-31T23:14:57.166545"}
+{"symbol": "BANKNIFTY", "date": "2026-01-31", "decision": "NO TRADE", "entry_price": 59610.45, "logged_at": "2026-01-31T23:14:57.934626"}
+{"symbol": "NIFTY50", "date": "2026-01-31", "decision": "NO TRADE", "entry_price": 25320.65, "logged_at": "2026-01-31T23:14:58.761115"}

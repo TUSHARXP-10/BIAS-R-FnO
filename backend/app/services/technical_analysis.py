@@ -260,46 +260,54 @@ class TechnicalAnalyzer:
             details.append("Trend Neutral (+10)")
             
         # 2. Trend Strength (ADX) (25 pts)
-        if adx > 25:
-            score += 25
-            details.append(f"Strong ADX {adx:.1f} (+25)")
-        elif adx > 20:
-            score += 15
-            details.append(f"Moderate ADX {adx:.1f} (+15)")
-        else:
+        if adx is None:
             score += 5
-            details.append(f"Weak ADX {adx:.1f} (+5)")
+            details.append("ADX unavailable (+5)")
+        else:
+            if adx > 25:
+                score += 25
+                details.append(f"Strong ADX {adx:.1f} (+25)")
+            elif adx > 20:
+                score += 15
+                details.append(f"Moderate ADX {adx:.1f} (+15)")
+            else:
+                score += 5
+                details.append(f"Weak ADX {adx:.1f} (+5)")
             
         # 3. Momentum (RSI) (25 pts)
         # Bullish context
-        if trend == "Bullish":
-            if 40 <= rsi <= 70: 
-                score += 25
-                details.append("RSI Bullish Zone (+25)")
-            elif rsi > 70:
-                score += 10
-                details.append("RSI Overbought (+10)")
-            else:
-                score += 5
-                details.append("RSI Weak (+5)")
-        # Bearish context
-        elif trend == "Bearish":
-            if 30 <= rsi <= 60:
-                score += 25
-                details.append("RSI Bearish Zone (+25)")
-            elif rsi < 30:
-                score += 10
-                details.append("RSI Oversold (+10)")
-            else:
-                score += 5
-                details.append("RSI Weak (+5)")
-        # Neutral context
+        if rsi is None:
+            score += 10
+            details.append("RSI unavailable (+10)")
         else:
-            if 40 <= rsi <= 60:
-                score += 25
-                details.append("RSI Range Stable (+25)")
+            if trend == "Bullish":
+                if 40 <= rsi <= 70: 
+                    score += 25
+                    details.append("RSI Bullish Zone (+25)")
+                elif rsi > 70:
+                    score += 10
+                    details.append("RSI Overbought (+10)")
+                else:
+                    score += 5
+                    details.append("RSI Weak (+5)")
+            # Bearish context
+            elif trend == "Bearish":
+                if 30 <= rsi <= 60:
+                    score += 25
+                    details.append("RSI Bearish Zone (+25)")
+                elif rsi < 30:
+                    score += 10
+                    details.append("RSI Oversold (+10)")
+                else:
+                    score += 5
+                    details.append("RSI Weak (+5)")
+            # Neutral context
             else:
-                score += 10
+                if 40 <= rsi <= 60:
+                    score += 25
+                    details.append("RSI Range Stable (+25)")
+                else:
+                    score += 10
         
         # 4. Volume Support (20 pts)
         if vol_surge:
@@ -407,9 +415,9 @@ class TechnicalAnalyzer:
         vol_ctx = self.get_volume_context()
         
         score, _ = self.calculate_confidence_score(
-            trend, 
-            indicators.get('adx'), 
-            indicators.get('rsi'), 
+            trend,
+            indicators.get('adx'),
+            indicators.get('rsi'),
             vol_ctx['surge']
         )
         
